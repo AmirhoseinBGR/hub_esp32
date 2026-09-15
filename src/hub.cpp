@@ -26,12 +26,24 @@ bool apply_server(const char *domain, uint16_t rate)
     return changed;
 }
 
-void apply_sim(const char *p1, const char *p2, const char *p3, uint16_t mask)
+bool apply_sim(const char *p1, const char *p2, const char *p3, uint16_t mask)
 {
-    strlcpy(hub.sim_phone[0], p1 ? p1 : "", sizeof(hub.sim_phone[0]));
-    strlcpy(hub.sim_phone[1], p2 ? p2 : "", sizeof(hub.sim_phone[1]));
-    strlcpy(hub.sim_phone[2], p3 ? p3 : "", sizeof(hub.sim_phone[2]));
-    hub.sim_alarm_enable = mask;
+    bool changed = false;
+    const char *p[PHONE_COUNT] = {p1, p2, p3};
+    for (int i = 0; i < PHONE_COUNT; i++)
+    {
+        if (strcmp(hub.sim_phone[i], p[i] ? p[i] : "") != 0)
+        {
+            strlcpy(hub.sim_phone[i], p[i] ? p[i] : "", sizeof(hub.sim_phone[i]));
+            changed = true;
+        }
+    }
+    if (hub.sim_alarm_enable != mask)
+    {
+        hub.sim_alarm_enable = mask;
+        changed = true;
+    }
+    return changed;
 }
 
 bool apply_device(uint8_t id, int16_t sp_temp_x10, int16_t sp_hum_x10, uint16_t mask, bool paired)
@@ -60,6 +72,8 @@ void hub_to_json(JsonDocument &doc)
     w["connected"] = hub.wifi_connected;
     w["ip"] = hub.wifi_ip;
     w["ap"] = AP_SSID;
+    w["phase"] = hub.wifi_phase;
+    w["err"] = hub.wifi_err;
 
     JsonObject s = doc["server"].to<JsonObject>();
     s["domain"] = hub.server_domain;
@@ -72,6 +86,25 @@ void hub_to_json(JsonDocument &doc)
     JsonArray ph = sim["phones"].to<JsonArray>();
     for (int i = 0; i < PHONE_COUNT; i++) ph.add(hub.sim_phone[i]);
     sim["mask"] = hub.sim_alarm_enable;
+
+    JsonObject g = doc["gsm"].to<JsonObject>();
+    g["seen"] = hub.gsm.seen;
+    g["fsm"] = hub.gsm.fsm;
+    g["act"] = hub.gsm.activity;
+    g["step"] = hub.gsm.step;
+    g["ready"] = hub.gsm.ready;
+    g["sim"] = hub.gsm.sim_ready;
+    g["net"] = hub.gsm.net_ready;
+    g["op"] = hub.gsm.operator_name;
+    g["rssi"] = hub.gsm.rssi;
+    g["bars"] = hub.gsm.bars;
+    g["sms_used"] = hub.gsm.sms_used;
+    g["sms_total"] = hub.gsm.sms_total;
+    g["paused"] = hub.gsm.queue_paused;
+    g["qsize"] = hub.gsm.queue_size;
+    g["qcap"] = hub.gsm.queue_cap;
+    g["call"] = hub.gsm.call;
+    g["peer"] = hub.gsm.peer;
 
     JsonArray devs = doc["devices"].to<JsonArray>();
     for (int i = 0; i < DEV_COUNT; i++)

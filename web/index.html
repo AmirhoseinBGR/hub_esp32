@@ -68,6 +68,16 @@ input,select{width:100%;background:var(--card2);border:1px solid var(--line);col
 input:focus,select:focus{border-color:var(--acc)}
 input::placeholder{color:#5b6b85}
 .hint{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.8}
+/* wifi status banner */
+.wfbanner{display:flex;align-items:center;gap:10px;border-radius:11px;padding:12px 15px;
+  font-size:13.5px;font-weight:bold;margin-bottom:4px}
+.wfbanner.ok{background:#0d3328;color:var(--ok)}
+.wfbanner.off{background:#1a2438;color:var(--dim)}
+.wfbanner.busy{background:#0c2b44;color:var(--acc)}
+.wfbanner.bad{background:#3a1512;color:var(--err)}
+#wf-msg{margin-top:10px;font-size:12.5px;font-weight:bold;min-height:18px}
+#wf-msg.err{color:var(--err)}
+#wf-msg.busy{color:var(--acc)}
 /* devices */
 .devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
 .dev{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:15px;
@@ -97,7 +107,30 @@ input::placeholder{color:#5b6b85}
 .chk input{width:auto;accent-color:var(--acc2)}
 .chk.dis{opacity:.45;cursor:not-allowed}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media(max-width:560px){.grid2,.grid3{grid-template-columns:1fr}}
+/* gsm status grid */
+.gsmgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.gcell{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.gcell small{display:block;color:var(--dim);font-size:10.5px;margin-bottom:5px}
+.gcell b{font-size:14px;word-break:break-all}
+.gcell b.ok{color:var(--ok)}
+.gcell b.err{color:var(--err)}
+.gcell b.warn{color:var(--warn)}
+.gcell b.acc{color:var(--acc)}
+/* gsm terminal */
+#term{background:#060b14;border:1px solid var(--line);border-radius:11px;height:340px;
+  overflow-y:auto;padding:12px 14px;font-family:'Courier New',monospace;font-size:12px;
+  line-height:1.65;direction:ltr;text-align:left;white-space:pre-wrap;word-break:break-all}
+.tl{color:#9fb0c9}
+.tl.err{color:#f87171}
+.tl.warn{color:#fbbf24}
+.tl.ok{color:#34d399}
+.tl.info{color:#38bdf8}
+.tl.sys{color:#c084fc}
+.termrow{display:flex;gap:8px;margin-top:10px;direction:ltr}
+.termrow input{font-family:'Courier New',monospace;flex:1;direction:ltr;text-align:left}
+.qbtns{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:12px}
 /* modal */
 .modal{position:fixed;inset:0;background:rgba(4,8,16,.72);display:none;align-items:center;
   justify-content:center;padding:16px;z-index:50;backdrop-filter:blur(3px)}
@@ -132,6 +165,7 @@ input::placeholder{color:#5b6b85}
       <div class="chip" title="وضعیت ارتباط با برد اصلی"><span class="dot" id="c-stm"></span>برد اصلی</div>
       <div class="chip" title="وضعیت وای‌فای"><span class="dot" id="c-wifi"></span><b id="c-wifi-t">--</b></div>
       <div class="chip" title="وضعیت سیم‌کارت"><span class="dot" id="c-sim"></span>سیم‌کارت</div>
+      <div class="chip" title="وضعیت مودم GSM"><span class="dot" id="c-gsm"></span><b id="c-gsm-t">--</b></div>
       <div class="chip" title="وضعیت سرور مرکزی"><span class="dot" id="c-srv"></span>سرور</div>
     </div>
   </header>
@@ -143,6 +177,7 @@ input::placeholder{color:#5b6b85}
     <button data-tab="wifi" onclick="tab('wifi')">📶 وای‌فای</button>
     <button data-tab="sim" onclick="tab('sim')">📱 سیم‌کارت</button>
     <button data-tab="srv" onclick="tab('srv')">☁ سرور</button>
+    <button data-tab="gsm" onclick="tab('gsm')">📡 مودم GSM</button>
   </nav>
 
   <!-- ================= dashboard ================= -->
@@ -180,14 +215,17 @@ input::placeholder{color:#5b6b85}
     <div class="grid">
       <div class="card">
         <h3><span class="ico">🔍</span> اتصال به شبکه</h3>
-        <div class="row"><span>وضعیت فعلی</span><b id="wf-cur">--</b></div>
-        <button class="btn sec" id="wf-scan" onclick="scanWifi()" style="margin-top:14px;width:100%">اسکن شبکه‌های اطراف</button>
+        <div class="wfbanner off" id="wf-banner"><span class="dot off" id="wf-bdot"></span><span id="wf-btext">--</span></div>
+        <button class="btn sec" id="wf-scan" onclick="scanWifi()" style="margin-top:12px;width:100%">اسکن شبکه‌های اطراف</button>
         <label>شبکه</label>
         <select id="wf-list"><option value="">-- ابتدا اسکن کنید --</option></select>
         <label>رمز عبور</label>
-        <input type="password" id="wf-pass" placeholder="رمز شبکه وای‌فای">
+        <input type="password" id="wf-pass" placeholder="رمز شبکه وای‌فای"
+               onfocus="this.value=''">
+        <div class="hint">با کلیک روی کادر رمز، رمز قبلی پاک می‌شود تا مستقیم تایپ کنید.</div>
         <button class="btn" id="wf-conn" onclick="saveWifi()" style="margin-top:14px;width:100%">اتصال و ذخیره</button>
-        <div class="hint">پس از ذخیره، این تنظیمات روی ESP32 نگه داشته می‌شود و بعد از هر خاموش/روشن خودکار وصل می‌شود.</div>
+        <div id="wf-msg"></div>
+        <div class="hint">پس از ذخیره، این تنظیمات روی ESP32 نگه داشته می‌شود و بعد از هر خاموش/روشن خودکار وصل می‌شود. اگر رمز اشتباه باشد یا شبکه پیدا نشود، همین‌جا پیام می‌گیرید.</div>
       </div>
       <div class="card">
         <h3><span class="ico">ℹ</span> نکته اتصال</h3>
@@ -204,17 +242,17 @@ input::placeholder{color:#5b6b85}
     <div class="grid">
       <div class="card">
         <h3><span class="ico">📞</span> شماره‌های هشدار</h3>
-        <label>شماره ۱</label><input id="ph1" maxlength="11" placeholder="09xxxxxxxxx">
-        <label>شماره ۲</label><input id="ph2" maxlength="11" placeholder="09xxxxxxxxx">
-        <label>شماره ۳</label><input id="ph3" maxlength="11" placeholder="09xxxxxxxxx">
+        <label>شماره ۱</label><input id="ph1" maxlength="11" placeholder="09xxxxxxxxx" inputmode="numeric">
+        <label>شماره ۲</label><input id="ph2" maxlength="11" placeholder="09xxxxxxxxx" inputmode="numeric">
+        <label>شماره ۳</label><input id="ph3" maxlength="11" placeholder="09xxxxxxxxx" inputmode="numeric">
         <div class="row" style="margin-top:10px"><span>اعتبار فعلی</span><b id="sim-credit2">--</b></div>
         <button class="btn" onclick="saveSim()" style="margin-top:14px;width:100%">ذخیره شماره‌ها</button>
+        <div class="hint">شماره‌ها روی برد اصلی ذخیره می‌شوند و بعد از خروج/ورود دوباره همین‌جا نمایش داده می‌شوند.</div>
       </div>
       <div class="card">
         <h3><span class="ico">🔔</span> هشدارهایی که پیام/تماس می‌دهند</h3>
         <div class="checks" id="sim-alarms"></div>
         <button class="btn" onclick="saveSim()" style="margin-top:14px;width:100%">ذخیره هشدارها</button>
-        <div class="hint">این تنظیمات روی برد اصلی (STM32) ذخیره می‌شود و برای آن ارسال می‌گردد.</div>
       </div>
     </div>
   </section>
@@ -235,7 +273,6 @@ input::placeholder{color:#5b6b85}
           <option value="60">۶۰ بار</option>
         </select>
         <button class="btn" onclick="saveServer()" style="margin-top:14px;width:100%">اعمال و ذخیره</button>
-        <div class="hint">تنظیمات سرور روی ESP32 ذخیره می‌شود و به برد اصلی هم منتقل می‌گردد.</div>
       </div>
       <div class="card">
         <h3><span class="ico">📡</span> تست ارتباط</h3>
@@ -243,6 +280,69 @@ input::placeholder{color:#5b6b85}
         <div class="row"><span>آخرین تست خودکار</span><b id="ping-auto">--</b></div>
         <button class="btn grn" id="ping-btn" onclick="pingServer()" style="margin-top:14px;width:100%">تست پینگ سرور</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ================= gsm ================= -->
+  <section id="tab-gsm">
+    <div class="card" style="margin-bottom:14px">
+      <h3><span><span class="ico">📡</span> وضعیت مودم GSM (زنده)</span>
+        <span class="badge dim" id="gsm-fsm">--</span></h3>
+      <div class="gsmgrid">
+        <div class="gcell"><small>مودم</small><b id="g-ready">--</b></div>
+        <div class="gcell"><small>سیم‌کارت</small><b id="g-sim">--</b></div>
+        <div class="gcell"><small>شبکه</small><b id="g-net">--</b></div>
+        <div class="gcell"><small>اپراتور</small><b id="g-op">--</b></div>
+        <div class="gcell"><small>آنتن</small><b id="g-sig">--</b></div>
+        <div class="gcell"><small>حافظه پیامک</small><b id="g-sms">--</b></div>
+        <div class="gcell"><small>صف کارها</small><b id="g-queue">--</b></div>
+        <div class="gcell"><small>تماس</small><b id="g-call">--</b></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3><span class="ico">⌨</span> فرمان سریع</h3>
+        <div class="qbtns">
+          <button class="btn sec sm" onclick="gcmd('i')">وضعیت زنده</button>
+          <button class="btn sec sm" onclick="gcmd('s')">اسکن وضعیت</button>
+          <button class="btn sec sm" onclick="gcmd('r')">پیامک‌های خوانده‌نشده</button>
+          <button class="btn sec sm" onclick="gcmd('d')">پاک‌سازی پیامک</button>
+          <button class="btn sec sm" onclick="gcmd('b')">استعلام شارژ</button>
+          <button class="btn sec sm" onclick="gcmd('p')">توقف/ادامه صف</button>
+          <button class="btn red sm" onclick="gcmd('x')">توقف و خالی‌کردن صف</button>
+          <button class="btn red sm" onclick="gcmd('h')">قطع تماس فوری</button>
+          <button class="btn sec sm" onclick="gcmd('R')">ریست نرم‌افزاری FSM</button>
+          <button class="btn red sm" onclick="gcmd('K')">ریست سخت‌افزاری (PWRKEY)</button>
+          <button class="btn sec sm" onclick="gcmd('L')">سطح لاگ بعدی</button>
+          <button class="btn sec sm" onclick="gcmd('m')">چاپ منو</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3><span class="ico">✉</span> ارسال پیامک / تماس / USSD</h3>
+        <label>شماره گیرنده</label>
+        <input id="g-num" placeholder="09xxxxxxxxx" inputmode="numeric" style="direction:ltr">
+        <label>متن پیامک</label>
+        <input id="g-txt" placeholder="متن پیامک">
+        <div class="grid2" style="margin-top:12px">
+          <button class="btn grn" onclick="gsmSms()">ارسال پیامک</button>
+          <button class="btn sec" onclick="gsmDial()">تماس</button>
+        </div>
+        <label style="margin-top:12px">کد USSD</label>
+        <input id="g-ussd" placeholder="*140*1#" style="direction:ltr">
+        <button class="btn sec" onclick="gsmUssd()" style="margin-top:10px;width:100%">ارسال USSD</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="ico">🖥</span> کنسول مودم</h3>
+      <div id="term" dir="ltr"></div>
+      <div class="termrow">
+        <input id="g-cmd" placeholder="at+csq  |  read 3  |  del 5  |  ..." autocomplete="off"
+               onkeydown="if(event.key==='Enter')gsmSend()">
+        <button class="btn" onclick="gsmSend()">ارسال</button>
+      </div>
+      <div class="hint">همه فرمان‌های منوی سریال دستگاه اینجا هم کار می‌کنند؛ خروجی و لاگ‌های مودم زنده در همین کنسول نمایش داده می‌شود. پاسخ AT ها هم اینجا می‌آید.</div>
     </div>
   </section>
 </div>
@@ -277,6 +377,7 @@ const ALARMS = ["دمای بالا","دمای پایین","رطوبت بالا",
 const FORCED = [6,8];               // sensor + offline cannot be disabled
 const ROTS   = ["خراب","چپ","راست"];
 let S = null, editId = 0;
+let termSeq = 0, termTimer = null, scanning = false, wifiAutoScanned = false;
 
 const $ = id => document.getElementById(id);
 
@@ -284,6 +385,11 @@ const $ = id => document.getElementById(id);
 function tab(name){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('act',b.dataset.tab===name));
   document.querySelectorAll('section').forEach(s=>s.classList.toggle('act',s.id==='tab-'+name));
+  if(name==='wifi' && !wifiAutoScanned){
+    wifiAutoScanned = true;
+    scanWifi();                      // auto-scan on first visit
+  }
+  if(name==='gsm' && !termTimer) termTimer = setInterval(pollTerm, 1200);
 }
 
 /* ---------- toast ---------- */
@@ -313,6 +419,9 @@ function render(){
   setDot('c-wifi', S.wifi.connected);
   $('c-wifi-t').textContent = S.wifi.connected ? S.wifi.ssid : (S.wifi.ssid ? 'قطع' : 'تنظیم نشده');
   setDot('c-sim', S.sim.ok);
+  const g = S.gsm || {};
+  setDot('c-gsm', !!g.ready);
+  $('c-gsm-t').textContent = g.seen ? (g.ready ? 'آماده' : 'در حال راه‌اندازی') : 'بدون پاسخ';
   setDot('c-srv', S.server.ok);
 
   // hub cards
@@ -327,28 +436,232 @@ function render(){
   $('v-ping').innerHTML = S.server.ok
     ? '<span style="color:var(--ok)">برقرار</span>' : '<span style="color:var(--err)">قطع</span>';
 
-  // wifi tab
-  $('wf-cur').textContent = S.wifi.connected ? 'متصل به ' + S.wifi.ssid : 'قطع';
-  $('wf-ap').textContent = S.wifi.ap;
-  $('wf-ip').textContent = S.wifi.ip || '--';
-  $('ping-auto').textContent = S.server.ok ? 'برقرار' : 'قطع / بی‌پاسخ';
+  renderWifi();
+  renderSim();
+  renderServer();
+  renderGsm();
+  renderDevices();
+}
 
-  // sim tab (only when empty to not fight typing)
-  if(document.activeElement.id !== 'ph1' && document.activeElement.id !== 'ph2' && document.activeElement.id !== 'ph3'){
+/* ---------- wifi tab ---------- */
+function renderWifi(){
+  const w = S.wifi;
+  const b = $('wf-banner'), bt = $('wf-btext'), bd = $('wf-bdot');
+
+  // banner: always shows the CURRENT connection, before and after scan
+  if(w.connected){
+    b.className = 'wfbanner ok'; bd.className = 'dot on';
+    bt.textContent = 'متصل به ' + w.ssid + (w.ip ? '  (' + w.ip + ')' : '');
+  } else if(w.phase === 1){
+    b.className = 'wfbanner busy'; bd.className = 'dot warn';
+    bt.textContent = 'در حال اتصال به ' + w.ssid + ' ...';
+  } else if(w.phase === 3){
+    b.className = 'wfbanner bad'; bd.className = 'dot off';
+    bt.textContent = w.err===1 ? 'اتصال ناموفق: رمز اشتباه بود'
+                   : w.err===2 ? 'اتصال ناموفق: شبکه پیدا نشد'
+                   : 'اتصال ناموفق';
+  } else if(w.ssid){
+    b.className = 'wfbanner off'; bd.className = 'dot off';
+    bt.textContent = 'ذخیره شده: ' + w.ssid + ' - متصل نیست';
+  } else {
+    b.className = 'wfbanner off'; bd.className = 'dot off';
+    bt.textContent = 'به هیچ شبکه‌ای متصل نیستید';
+  }
+
+  // message under the connect button
+  const m = $('wf-msg');
+  if(w.phase === 1){ m.className='busy'; m.textContent='در حال تست رمز و اتصال ... تا ۲۰ ثانیه صبر کنید'; }
+  else if(w.phase === 3){
+    m.className='err';
+    m.textContent = w.err===1 ? '✗ رمز عبور اشتباه بود - رمز را پاک کرده و دوباره وارد کنید'
+                  : w.err===2 ? '✗ شبکه پیدا نشد یا پاسخی نیامد (تایم‌اوت)'
+                  : '✗ اتصال برقرار نشد - دوباره تلاش کنید';
+  }
+  else if(w.connected){ m.className=''; m.textContent='✓ متصل است'; }
+  else { m.className=''; m.textContent=''; }
+
+  $('wf-ap').textContent = w.ap;
+  $('wf-ip').textContent = w.ip || '--';
+
+  // mark the connected network inside the dropdown
+  const sel = $('wf-list');
+  for(const o of sel.options){
+    if(!o.value) continue;
+    o.textContent = (o.value === w.ssid && w.connected) ? '✓ ' + o.value : o.value;
+  }
+}
+
+async function scanWifi(){
+  if(scanning) return;
+  scanning = true;
+  $('wf-scan').disabled = true;
+  $('wf-scan').textContent = 'در حال اسکن...';
+  try{
+    for(let i=0;i<40;i++){          // poll the async scan, page stays alive
+      const r = await fetch('/api/scan' + (i===0 ? '?refresh=1' : ''));
+      const d = await r.json();
+      if((d.networks && d.networks.length) || !d.scanning){
+        fillScanList(d.networks || []);
+        break;
+      }
+      await new Promise(r=>setTimeout(r, 700));
+    }
+  }catch(e){ toast('اسکن ناموفق', false); }
+  $('wf-scan').disabled = false;
+  $('wf-scan').textContent = 'اسکن مجدد';
+  scanning = false;
+}
+
+function fillScanList(list){
+  const sel = $('wf-list');
+  const cur = S && S.wifi.connected ? S.wifi.ssid : '';
+  sel.innerHTML = list.length
+    ? list.map(n=>{
+        const mark = (n===cur) ? ' ✓' : '';
+        return `<option value="${esc(n)}">${esc(n)}${mark}</option>`;
+      }).join('')
+    : '<option value="">شبکه‌ای پیدا نشد</option>';
+  if(cur && list.includes(cur)) sel.value = cur;
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+async function saveWifi(){
+  const ssid = $('wf-list').value;
+  const pass = $('wf-pass').value;
+  if(!ssid) return toast('ابتدا شبکه را انتخاب کنید', false);
+  $('wf-conn').disabled = true;
+  const ok = await post('/api/wifi', {ssid, pass});
+  $('wf-conn').disabled = false;
+  if(ok){ $('wf-pass').value = ''; poll(); }
+  toast(ok ? 'در حال اتصال به ' + ssid + ' ...' : 'ارسال ناموفق', ok);
+}
+
+/* ---------- sim tab ---------- */
+function renderSim(){
+  // refresh the fields only when the user is not typing in them
+  const ae = document.activeElement ? document.activeElement.id : '';
+  if(ae !== 'ph1' && ae !== 'ph2' && ae !== 'ph3'){
     $('ph1').value = S.sim.phones[0] || '';
     $('ph2').value = S.sim.phones[1] || '';
     $('ph3').value = S.sim.phones[2] || '';
   }
   $('sim-credit2').textContent = fmtCredit(S.sim.credit);
   drawChecks('sim-alarms', S.sim.mask, null);
-
-  // server tab
-  if(document.activeElement.id !== 'sv-domain') $('sv-domain').value = S.server.domain;
-  $('sv-rate').value = String(S.server.rate);
-
-  renderDevices();
 }
 
+async function saveSim(){
+  const ok = await post('/api/sim', {
+    p1:$('ph1').value.trim(), p2:$('ph2').value.trim(), p3:$('ph3').value.trim(),
+    mask:readChecks('sim-alarms')
+  });
+  if(ok) poll();
+  toast(ok ? 'تنظیمات سیم‌کارت ذخیره و به برد اصلی ارسال شد' : 'ارسال ناموفق', ok);
+}
+
+/* ---------- server tab ---------- */
+function renderServer(){
+  if(document.activeElement && document.activeElement.id !== 'sv-domain')
+    $('sv-domain').value = S.server.domain;
+  $('sv-rate').value = String(S.server.rate);
+  $('ping-auto').textContent = S.server.ok ? 'برقرار' : 'قطع / بی‌پاسخ';
+}
+
+async function saveServer(){
+  const ok = await post('/api/server', {domain:$('sv-domain').value.trim(), rate:+$('sv-rate').value});
+  if(ok) poll();
+  toast(ok ? 'تنظیمات سرور ذخیره شد' : 'ارسال ناموفق', ok);
+}
+
+async function pingServer(){
+  $('ping-btn').disabled = true;
+  $('ping-res').textContent = '...در حال تست';
+  try{
+    const r = await fetch('/api/ping');
+    const d = await r.json();
+    $('ping-res').innerHTML = d.ok
+      ? '<span style="color:var(--ok)">برقرار است</span>'
+      : '<span style="color:var(--err)">پاسخی دریافت نشد</span>';
+  }catch(e){ $('ping-res').textContent = 'خطا'; }
+  $('ping-btn').disabled = false;
+}
+
+/* ---------- gsm tab ---------- */
+function renderGsm(){
+  const g = S.gsm || {};
+  $('gsm-fsm').textContent = g.seen ? (g.fsm + (g.step ? ' / ' + g.step : '')) : 'بدون پاسخ از برد اصلی';
+
+  const set = (id, txt, cls) => { const e=$(id); e.textContent = txt; if(cls!==undefined) e.className = cls; };
+  set('g-ready', g.seen ? (g.ready ? 'آماده' : 'در حال راه‌اندازی') : '--', g.ready?'ok':'warn');
+  set('g-sim', g.seen ? (g.sim ? 'آماده' : 'خطا') : '--', g.sim?'ok':'err');
+  set('g-net', g.seen ? (g.net ? 'ثبت شده' : 'بدون شبکه') : '--', g.net?'ok':'err');
+  set('g-op', g.op || '--');
+  set('g-sig', g.seen ? (g.rssi + ' dBm  [' + fa(g.bars) + '/۵]') : '--', g.bars>=3?'ok':(g.bars>0?'warn':'err'));
+  set('g-sms', g.seen ? fa(g.sms_used) + '/' + fa(g.sms_total) + ' پیامک' : '--');
+  set('g-queue', g.seen ? ((g.paused ? 'متوقف! ' : '') + fa(g.qsize) + '/' + fa(g.qcap)) : '--',
+      g.paused ? 'warn' : (g.qsize ? 'acc' : 'ok'));
+  set('g-call', g.seen ? (g.call + (g.peer && g.call!=='idle' ? ' ← ' + g.peer : '')) : '--',
+      (g.call && g.call!=='idle') ? 'warn' : '');
+}
+
+function termLineClass(t){
+  if(/ERROR|\[!\]|CRITICAL|FAIL/i.test(t)) return 'err';
+  if(/WARN|PAUSED/i.test(t)) return 'warn';
+  if(/Succeeded|OK|READY|\[SMS\]/i.test(t)) return 'ok';
+  if(/JOB#|USSD|CALL/i.test(t)) return 'info';
+  if(/^gsm>|^#/.test(t)) return 'sys';
+  return '';
+}
+
+async function pollTerm(){
+  try{
+    const r = await fetch('/api/gsm?after=' + termSeq);
+    const d = await r.json();
+    if(!d.logs || !d.logs.length) return;
+    const term = $('term');
+    const stick = term.scrollTop + term.clientHeight >= term.scrollHeight - 30;
+    for(const l of d.logs){
+      const div = document.createElement('div');
+      div.className = 'tl ' + termLineClass(l.t);
+      div.textContent = l.t;
+      term.appendChild(div);
+      termSeq = l.seq;
+    }
+    while(term.children.length > 400) term.removeChild(term.firstChild);
+    if(stick) term.scrollTop = term.scrollHeight;
+  }catch(e){}
+}
+
+async function gcmd(cmd){
+  const ok = await post('/api/gsm', {cmd});
+  toast(ok ? 'فرمان ارسال شد' : 'برد اصلی در دسترس نیست', ok);
+}
+
+function gsmSend(){
+  const v = $('g-cmd').value.trim();
+  if(!v) return;
+  $('g-cmd').value = '';
+  gcmd(v);
+}
+
+async function gsmSms(){
+  const n = $('g-num').value.trim(), t = $('g-txt').value.trim();
+  if(!n || !t) return toast('شماره و متن پیامک را وارد کنید', false);
+  await gcmd('sms ' + n + ' ' + t);
+  $('g-txt').value = '';
+}
+function gsmDial(){
+  const n = $('g-num').value.trim();
+  if(!n) return toast('شماره را وارد کنید', false);
+  gcmd('dial ' + n);
+}
+function gsmUssd(){
+  const c = $('g-ussd').value.trim();
+  if(!c) return toast('کد USSD را وارد کنید', false);
+  gcmd('ussd ' + c);
+}
+
+/* ---------- devices ---------- */
 function renderDevices(){
   const g = $('devgrid');
   if(!g.dataset.built){
@@ -435,63 +748,13 @@ async function post(url, body){
   }catch(e){ return false; }
 }
 
-async function saveWifi(){
-  const ssid = $('wf-list').value;
-  const pass = $('wf-pass').value;
-  if(!ssid) return toast('ابتدا شبکه را انتخاب کنید', false);
-  $('wf-conn').disabled = true;
-  const ok = await post('/api/wifi', {ssid, pass});
-  $('wf-conn').disabled = false;
-  toast(ok ? 'در حال اتصال به ' + ssid + ' ...' : 'ارسال ناموفق', ok);
-}
-
-async function scanWifi(){
-  $('wf-scan').disabled = true;
-  $('wf-scan').textContent = 'در حال اسکن...';
-  try{
-    const r = await fetch('/api/scan');
-    const d = await r.json();
-    const sel = $('wf-list');
-    sel.innerHTML = d.networks.length
-      ? d.networks.map(n=>`<option value="${n}">${n}</option>`).join('')
-      : '<option value="">شبکه‌ای پیدا نشد</option>';
-  }catch(e){ toast('اسکن ناموفق', false); }
-  $('wf-scan').disabled = false;
-  $('wf-scan').textContent = 'اسکن شبکه‌های اطراف';
-}
-
-async function saveSim(){
-  const ok = await post('/api/sim', {
-    p1:$('ph1').value.trim(), p2:$('ph2').value.trim(), p3:$('ph3').value.trim(),
-    mask:readChecks('sim-alarms')
-  });
-  toast(ok ? 'تنظیمات سیم‌کارت ذخیره و به برد اصلی ارسال شد' : 'ارسال ناموفق', ok);
-}
-
-async function saveServer(){
-  const ok = await post('/api/server', {domain:$('sv-domain').value.trim(), rate:+$('sv-rate').value});
-  toast(ok ? 'تنظیمات سرور ذخیره شد' : 'ارسال ناموفق', ok);
-}
-
-async function pingServer(){
-  $('ping-btn').disabled = true;
-  $('ping-res').textContent = '...در حال تست';
-  try{
-    const r = await fetch('/api/ping');
-    const d = await r.json();
-    $('ping-res').innerHTML = d.ok
-      ? '<span style="color:var(--ok)">برقرار است</span>'
-      : '<span style="color:var(--err)">پاسخی دریافت نشد</span>';
-  }catch(e){ $('ping-res').textContent = 'خطا'; }
-  $('ping-btn').disabled = false;
-}
-
 async function saveDevice(){
   const ok = await post('/api/device', {
     id:editId, sp_t:+$('m-sp-t').value, sp_h:+$('m-sp-h').value,
     mask:readChecks('m-alarms'), paired:$('m-paired').checked
   });
   closeModal();
+  if(ok) poll();
   toast(ok ? 'تنظیمات دستگاه ذخیره و ارسال شد' : 'ارسال ناموفق', ok);
 }
 
@@ -502,7 +765,8 @@ async function poll(){
     S = await r.json();
     render();
   }catch(e){
-    setDot('c-stm', false); setDot('c-wifi', false); setDot('c-sim', false); setDot('c-srv', false);
+    setDot('c-stm', false); setDot('c-wifi', false); setDot('c-sim', false);
+    setDot('c-gsm', false); setDot('c-srv', false);
   }
 }
 $('modal').addEventListener('click', e=>{ if(e.target.id==='modal') closeModal(); });

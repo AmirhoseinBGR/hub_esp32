@@ -1,11 +1,11 @@
 /** uart_link.cpp - protocol parser. Every message is one line: TYPE|f1|f2|... */
 #include "uart_link.h"
 #include "config.h"
+#include "gsm_log.h"
 #include "hub.h"
 #include "net.h"
 #include "store.h"
 #include <HardwareSerial.h>
-#include <WiFi.h>
 
 static HardwareSerial stm(2);
 static char rx_line[LINE_MAX];
@@ -82,40 +82,55 @@ static void handle_state(char *body)
             d.alarms = hex16(f[6]);
         }
     }
-    else if (n >= 5 && strcmp(f[0], "HUB") == 0)
+    else if (n >= 3 && strcmp(f[0], "HUB") == 0)
     {
         hub.sim_ok = atoi(f[1]) != 0;
         hub.sim_credit = atol(f[2]);
     }
 }
 
+// GSM:ST|fsm|act|step|ready|sim|net|operator|rssi|bars|smsu|smst|paused|qsize|qcap|call|peer
+static void handle_gsm_st(char *body)
+{
+    char *f[17];
+    int n = split_fields(body, f, 17);
+    if (n < 16) return;
+
+    GsmLive &g = hub.gsm;
+    g.seen = true;
+    strlcpy(g.fsm, f[0], sizeof(g.fsm));
+    strlcpy(g.activity, f[1], sizeof(g.activity));
+    strlcpy(g.step, f[2], sizeof(g.step));
+    g.ready = atoi(f[3]) != 0;
+    g.sim_ready = atoi(f[4]) != 0;
+    g.net_ready = atoi(f[5]) != 0;
+    strlcpy(g.operator_name, f[6], sizeof(g.operator_name));
+    g.rssi = atoi(f[7]);
+    g.bars = atoi(f[8]);
+    g.sms_used = (uint16_t)atoi(f[9]);
+    g.sms_total = (uint16_t)atoi(f[10]);
+    g.queue_paused = atoi(f[11]) != 0;
+    g.queue_size = (uint8_t)atoi(f[12]);
+    g.queue_cap = (uint8_t)atoi(f[13]);
+    strlcpy(g.call, f[14], sizeof(g.call));
+    strlcpy(g.peer, f[15], sizeof(g.peer));
+
+    hub.last_rx_ms = millis();
+    hub.stm32_ok = true;
+}
+
 static void handle_req(char *body)
 {
-    if (strcmp(body, "SCAN") == 0)
-    {
-        int n = WiFi.scanNetworks();
-        char list[200] = "";
-        for (int i = 0; i < n && i < 5; i++)
-        {
-            if (i > 0) strlcat(list, ",", sizeof(list));
-            strlcat(list, WiFi.SSID(i).c_str(), sizeof(list));
-        }
-        uart_send("WIFI:SCAN_RES:%s", list);
-    }
+    if (strcmp(body, "SCAN") == 0) net_scan_start(); // reply comes when scan finishes
     else if (strcmp(body, "PING") == 0)
-    {
         uart_send("SERVER:PING_RES:%s", net_ping_server() ? "OK" : "FAIL");
-    }
-    else if (strcmp(body, "CREDIT") == 0)
-    {
-        uart_send("CREDIT:%ld", (long)hub.sim_credit);
-    }
+    else if (strcmp(body, "CREDIT") == 0) uart_send("CREDIT:%ld", (long)hub.sim_credit);
 }
 
 static void handle_legacy(const char *line)
 {
     // Old colon format, kept so mixed old/new firmware still works
-    if (strcmp(line, "WIFI:SCAN") == 0) { handle_req((char *)"SCAN"); return; }
+    if (strcmp(line, "WIFI:SCAN") == 0) { net_scan_start(); return; }
     if (strncmp(line, "WIFI:CONNECT:", 13) == 0)
     {
         const char *rest = line + 13;
@@ -151,7 +166,17 @@ static void process_line(const char *line)
 {
     if (line[0] == '\0') return;
 
-    if (strncmp(line, "SET:", 4) == 0)
+    if (strncmp(line, "GSM:LOG|", 8) == 0)
+    {
+        gsm_log_add(line + 8);
+    }
+    else if (strncmp(line, "GSM:ST|", 7) == 0)
+    {
+        char body[LINE_MAX];
+        strlcpy(body, line + 7, sizeof(body));
+        handle_gsm_st(body);
+    }
+    else if (strncmp(line, "SET:", 4) == 0)
     {
         char body[LINE_MAX];
         strlcpy(body, line + 4, sizeof(body));
@@ -181,6 +206,7 @@ static void process_line(const char *line)
 
 void uart_begin()
 {
+    stm.setRxBufferSize(1024); // must be before begin()
     stm.begin(UART_BAUD, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
 }
 

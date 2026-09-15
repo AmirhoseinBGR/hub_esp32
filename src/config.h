@@ -12,13 +12,18 @@
  *   STATE:DEV|<id>|<0|1>|<t_x10>|<h_x10>|<rot>|<mask_hex>
  *   STATE:HUB|<sim_ok>|<credit>|<wifi>|<server_ok>
  *   REQ:SCAN / REQ:PING / REQ:CREDIT
+ *   GSM:ST|<fsm>|<act>|<step>|<ready>|<sim>|<net>|<op>|<rssi>|<bars>|
+ *         <smsu>|<smst>|<paused>|<qsize>|<qcap>|<call>|<peer>   (modem live)
+ *   GSM:LOG|<text>                          modem console line
  *
  * ESP32 -> STM32:
  *   WIFI:STATUS:CONNECTED:<ssid> | WIFI:STATUS:DISCONNECTED
+ *   WIFI:STATUS:FAILED:AUTH | WIFI:STATUS:FAILED:TIMEOUT
  *   WIFI:SCAN_RES:<ssid>,<ssid>,...
  *   SERVER:PING_RES:OK | SERVER:PING_RES:FAIL
  *   SERVER:SYNC_RES:OK
  *   CREDIT:<toman>
+ *   GSM:CMD|<command>                       web/serial -> modem CLI
  */
 #pragma once
 

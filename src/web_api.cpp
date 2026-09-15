@@ -1,20 +1,23 @@
 /**
- * web_api.cpp - the whole API is 6 endpoints:
+ * web_api.cpp - the whole API:
  *
  *   GET  /             web page
- *   GET  /api/state    everything: settings + live states (web polls this)
- *   GET  /api/scan     scan WiFi networks
- *   GET  /api/ping     test central server reachability
+ *   GET  /api/state    everything: settings + live states + gsm status
+ *   GET  /api/scan     start/poll async WiFi scan  {scanning, networks[]}
+ *   GET  /api/ping     test central server now
+ *   GET  /api/gsm      gsm console log lines ?after=<seq>
  *   POST /api/wifi     {ssid, pass}
  *   POST /api/server   {domain, rate}
  *   POST /api/sim      {p1, p2, p3, mask}
  *   POST /api/device   {id, sp_t, sp_h, mask, paired}
+ *   POST /api/gsm      {cmd: "sms 0912... hi"} -> forwarded to STM32 modem CLI
  *
  * Every POST applies locally, persists when ESP32 owns the data,
  * and forwards SET: to the STM32 so both sides stay in sync.
  */
 #include "web_api.h"
 #include "config.h"
+#include "gsm_log.h"
 #include "hub.h"
 #include "index_html.h"
 #include "net.h"
@@ -43,11 +46,22 @@ static void handle_state()
 
 static void handle_scan()
 {
-    int n = WiFi.scanNetworks();
+    // Non-blocking: first call kicks an async scan, later calls pick the result up.
+    // ?refresh=1 forces a new scan (the panel's re-scan button).
+    if (hub.scanning)
+    {
+        /* just report current status below */
+    }
+    else if (server.hasArg("refresh") || hub.scan_count == 0)
+    {
+        hub.scan_count = 0;
+        net_scan_start();
+    }
+
     JsonDocument doc;
+    doc["scanning"] = hub.scanning;
     JsonArray list = doc["networks"].to<JsonArray>();
-    for (int i = 0; i < n && i < 10; i++) list.add(WiFi.SSID(i));
-    WiFi.scanDelete();
+    for (int i = 0; i < hub.scan_count; i++) list.add(hub.scan_list[i]);
     reply_json(200, doc);
 }
 
@@ -62,6 +76,7 @@ static void handle_wifi()
 
     apply_wifi(ssid, pass, true);
     store_save_wifi();
+    hub.scan_count = 0; // force fresh scan next time
     net_start_connect();
     uart_send("SET:WIFI|%s|%s|1", ssid, pass);
     reply_ok(true);
@@ -117,12 +132,44 @@ static void handle_device()
     reply_ok(true);
 }
 
+static void handle_gsm_get()
+{
+    uint32_t after = (uint32_t)strtoul(server.arg("after").c_str(), NULL, 10);
+    JsonDocument doc;
+    doc["seq"] = hub.gsm.seen ? 1 : 0;
+    JsonArray logs = doc["logs"].to<JsonArray>();
+    gsm_log_to_json(logs, after, 40);
+    reply_json(200, doc);
+}
+
+static void handle_gsm_cmd()
+{
+    JsonDocument req;
+    if (deserializeJson(req, server.arg("plain"))) return reply_ok(false);
+
+    const char *cmd = req["cmd"] | "";
+    if (cmd[0] == '\0') return reply_ok(false);
+
+    // keep one clean line: no pipes, no control characters
+    char clean[128];
+    size_t o = 0;
+    for (const char *p = cmd; *p && o + 1 < sizeof(clean); p++)
+        if (*p != '|' && (unsigned char)*p >= 0x20) clean[o++] = *p;
+    clean[o] = '\0';
+    if (clean[0] == '\0') return reply_ok(false);
+
+    uart_send("GSM:CMD|%s", clean);
+    reply_ok(true);
+}
+
 void web_begin()
 {
     server.on("/", HTTP_GET, [] { server.send_P(200, "text/html; charset=utf-8", (const char *)INDEX_HTML); });
     server.on("/api/state", HTTP_GET, handle_state);
     server.on("/api/scan", HTTP_GET, handle_scan);
     server.on("/api/ping", HTTP_GET, [] { reply_ok(net_ping_server()); });
+    server.on("/api/gsm", HTTP_GET, handle_gsm_get);
+    server.on("/api/gsm", HTTP_POST, handle_gsm_cmd);
     server.on("/api/wifi", HTTP_POST, handle_wifi);
     server.on("/api/server", HTTP_POST, handle_server);
     server.on("/api/sim", HTTP_POST, handle_sim);
