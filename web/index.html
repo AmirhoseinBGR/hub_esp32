@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ایوهاچ - سامانه کنترل هاب</title>
+<style>
+:root{
+  --bg:#0b1220;--card:#131c2e;--card2:#0f1728;--line:#243047;--line2:#2d3b58;
+  --txt:#eaf1fb;--dim:#8fa1bd;--acc:#38bdf8;--acc2:#2563eb;
+  --ok:#34d399;--err:#f87171;--warn:#fbbf24;
+  --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:Tahoma,'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--txt);min-height:100vh;padding:14px}
+.wrap{max-width:1150px;margin:0 auto}
+/* header */
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+  background:linear-gradient(135deg,#101a2e,#152238);border:1px solid var(--line);
+  border-radius:var(--r);padding:16px 20px;margin-bottom:14px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--acc2),var(--acc));
+  display:flex;align-items:center;justify-content:center;font-size:22px}
+.brand h1{font-size:17px}
+.brand small{display:block;color:var(--dim);font-size:11px;font-weight:normal;margin-top:3px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:7px;background:var(--card2);border:1px solid var(--line);
+  border-radius:20px;padding:6px 13px;font-size:12px;color:var(--dim);cursor:default}
+.chip b{color:var(--txt);font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;background:#556;flex-shrink:0}
+.dot.on{background:var(--ok);box-shadow:0 0 7px var(--ok)}
+.dot.off{background:var(--err);box-shadow:0 0 7px var(--err)}
+.dot.warn{background:var(--warn);box-shadow:0 0 7px var(--warn)}
+/* tabs */
+nav{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px}
+nav button{background:var(--card);border:1px solid var(--line);color:var(--dim);padding:10px 20px;
+  border-radius:10px;cursor:pointer;font-size:13.5px;font-weight:bold;white-space:nowrap;transition:.18s}
+nav button:hover{color:var(--txt);border-color:var(--line2)}
+nav button.act{background:var(--acc2);border-color:var(--acc2);color:#fff}
+section{display:none}
+section.act{display:block;animation:fade .25s}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.card h3{font-size:13px;color:var(--dim);font-weight:normal;margin-bottom:14px;display:flex;
+  align-items:center;gap:8px;justify-content:space-between}
+.row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;
+  border-bottom:1px dashed var(--line);font-size:13px;gap:10px}
+.row:last-child{border:none}
+.row span:first-child{color:var(--dim);flex-shrink:0}
+.row b{font-weight:600;text-align:left;word-break:break-all}
+.ico{font-size:16px}
+/* buttons + inputs */
+button{font-family:inherit}
+.btn{background:var(--acc2);color:#fff;border:none;border-radius:9px;padding:9px 16px;font-size:13px;
+  font-weight:bold;cursor:pointer;transition:.18s;width:auto}
+.btn:hover{filter:brightness(1.15)}
+.btn:disabled{opacity:.5;cursor:wait}
+.btn.sec{background:#243250}
+.btn.sec:hover{background:#2d3d63}
+.btn.grn{background:#0e9f6e}
+.btn.red{background:#c0392b}
+.btn.sm{padding:6px 12px;font-size:12px;border-radius:8px}
+label{display:block;font-size:12px;color:var(--dim);margin:12px 0 5px}
+input,select{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--txt);
+  border-radius:9px;padding:10px 12px;font-size:13.5px;outline:none;transition:.18s}
+input:focus,select:focus{border-color:var(--acc)}
+input::placeholder{color:#5b6b85}
+.hint{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.8}
+/* devices */
+.devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.dev{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:15px;
+  display:flex;flex-direction:column;gap:9px;transition:.2s}
+.dev.off{opacity:.55}
+.dev.bad{border-color:#7f2d2d}
+.dev .top{display:flex;justify-content:space-between;align-items:center}
+.dev .name{font-weight:bold;font-size:14px}
+.dev .vals{display:flex;gap:10px}
+.metric{flex:1;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.metric small{display:block;color:var(--dim);font-size:10.5px;margin-bottom:4px}
+.metric b{font-size:19px;font-weight:700}
+.metric i{font-style:normal;font-size:10px;color:var(--dim);display:block;margin-top:2px}
+.badge{display:inline-flex;align-items:center;gap:5px;border-radius:14px;padding:3px 10px;font-size:11px;font-weight:bold}
+.badge.ok{background:#0d3328;color:var(--ok)}
+.badge.err{background:#3a1512;color:var(--err)}
+.badge.dim{background:#1a2438;color:var(--dim)}
+.alarms{display:flex;flex-wrap:wrap;gap:5px}
+.al{background:#3a1512;color:#ffb4a8;border-radius:6px;padding:2px 8px;font-size:10.5px}
+.dev .foot{display:flex;justify-content:space-between;align-items:center;margin-top:auto}
+.rot{font-size:11.5px;color:var(--dim)}
+/* checks */
+.checks{display:flex;flex-direction:column;gap:8px}
+.chk{display:flex;align-items:center;gap:9px;background:var(--card2);border:1px solid var(--line);
+  border-radius:9px;padding:8px 12px;font-size:12.5px;cursor:pointer;transition:.15s}
+.chk:hover{border-color:var(--line2)}
+.chk input{width:auto;accent-color:var(--acc2)}
+.chk.dis{opacity:.45;cursor:not-allowed}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(4,8,16,.72);display:none;align-items:center;
+  justify-content:center;padding:16px;z-index:50;backdrop-filter:blur(3px)}
+.modal.open{display:flex}
+.mbox{background:var(--card);border:1px solid var(--line2);border-radius:16px;padding:22px;
+  width:100%;max-width:430px;max-height:88vh;overflow-y:auto}
+.mbox h3{margin-bottom:4px;font-size:16px}
+.mbox .sub{color:var(--dim);font-size:12px;margin-bottom:8px}
+.mrow{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+/* toast */
+#toasts{position:fixed;bottom:18px;left:18px;display:flex;flex-direction:column;gap:8px;z-index:99}
+.toast{background:#152238;border:1px solid var(--line2);border-radius:11px;padding:11px 18px;
+  font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:fade .25s}
+.toast.ok{border-color:#14532d;color:var(--ok)}
+.toast.err{border-color:#7f1d1d;color:var(--err)}
+.banner{background:#3a2b10;border:1px solid #8a6414;color:#fde68a;border-radius:10px;
+  padding:10px 16px;font-size:12.5px;margin-bottom:14px;display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="logo">🐣</div>
+      <div>
+        <h1>سامانه کنترل هاب ایوهاچ</h1>
+        <small>پنل محلی - بدون نیاز به اینترنت</small>
+      </div>
+    </div>
+    <div class="chips">
+      <div class="chip" title="وضعیت ارتباط با برد اصلی"><span class="dot" id="c-stm"></span>برد اصلی</div>
+      <div class="chip" title="وضعیت وای‌فای"><span class="dot" id="c-wifi"></span><b id="c-wifi-t">--</b></div>
+      <div class="chip" title="وضعیت سیم‌کارت"><span class="dot" id="c-sim"></span>سیم‌کارت</div>
+      <div class="chip" title="وضعیت سرور مرکزی"><span class="dot" id="c-srv"></span>سرور</div>
+    </div>
+  </header>
+
+  <div class="banner" id="stale">⚠ ارتباط با برد اصلی (STM32) برقرار نیست - داده‌ها ممکن است قدیمی باشند</div>
+
+  <nav>
+    <button class="act" data-tab="dash" onclick="tab('dash')">📊 داشبورد</button>
+    <button data-tab="wifi" onclick="tab('wifi')">📶 وای‌فای</button>
+    <button data-tab="sim" onclick="tab('sim')">📱 سیم‌کارت</button>
+    <button data-tab="srv" onclick="tab('srv')">☁ سرور</button>
+  </nav>
+
+  <!-- ================= dashboard ================= -->
+  <section id="tab-dash" class="act">
+    <div class="grid">
+      <div class="card">
+        <h3><span><span class="ico">📶</span> وای‌فای</span><button class="btn sec sm" onclick="tab('wifi')">تنظیمات</button></h3>
+        <div class="row"><span>وضعیت</span><b id="w-st">--</b></div>
+        <div class="row"><span>شبکه</span><b id="w-ssid">--</b></div>
+        <div class="row"><span>آی‌پی</span><b id="w-ip">--</b></div>
+      </div>
+      <div class="card">
+        <h3><span><span class="ico">📱</span> سیم‌کارت</span><button class="btn sec sm" onclick="tab('sim')">تنظیمات</button></h3>
+        <div class="row"><span>وضعیت</span><b id="s-st">--</b></div>
+        <div class="row"><span>اعتبار</span><b id="s-credit">--</b></div>
+        <div class="row"><span>شماره‌ها</span><b id="s-count">--</b></div>
+      </div>
+      <div class="card">
+        <h3><span><span class="ico">☁</span> سرور مرکزی</span><button class="btn sec sm" onclick="tab('srv')">تنظیمات</button></h3>
+        <div class="row"><span>آدرس</span><b id="v-domain">--</b></div>
+        <div class="row"><span>نرخ ارسال</span><b id="v-rate">--</b></div>
+        <div class="row"><span>آخرین تست</span><b id="v-ping">--</b></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <h3><span><span class="ico">🌡</span> دستگاه‌های متصل (اینکوباتور)</span>
+        <span class="badge dim" id="dev-count">0/8 آنلاین</span></h3>
+      <div class="devgrid" id="devgrid"></div>
+    </div>
+  </section>
+
+  <!-- ================= wifi ================= -->
+  <section id="tab-wifi">
+    <div class="grid">
+      <div class="card">
+        <h3><span class="ico">🔍</span> اتصال به شبکه</h3>
+        <div class="row"><span>وضعیت فعلی</span><b id="wf-cur">--</b></div>
+        <button class="btn sec" id="wf-scan" onclick="scanWifi()" style="margin-top:14px;width:100%">اسکن شبکه‌های اطراف</button>
+        <label>شبکه</label>
+        <select id="wf-list"><option value="">-- ابتدا اسکن کنید --</option></select>
+        <label>رمز عبور</label>
+        <input type="password" id="wf-pass" placeholder="رمز شبکه وای‌فای">
+        <button class="btn" id="wf-conn" onclick="saveWifi()" style="margin-top:14px;width:100%">اتصال و ذخیره</button>
+        <div class="hint">پس از ذخیره، این تنظیمات روی ESP32 نگه داشته می‌شود و بعد از هر خاموش/روشن خودکار وصل می‌شود.</div>
+      </div>
+      <div class="card">
+        <h3><span class="ico">ℹ</span> نکته اتصال</h3>
+        <div class="row"><span>اکسس‌پوینت هاب</span><b id="wf-ap">--</b></div>
+        <div class="row"><span>آی‌پی محلی</span><b>192.168.4.1</b></div>
+        <div class="row"><span>آی‌پی در شبکه</span><b id="wf-ip">--</b></div>
+        <div class="hint">اگر وای‌فای قطع شود، می‌توانید مستقیم به اکسس‌پوینت هاب وصل شوید و از همین صفحه استفاده کنید. پنل کاملاً آفلاین کار می‌کند.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= sim ================= -->
+  <section id="tab-sim">
+    <div class="grid">
+      <div class="card">
+        <h3><span class="ico">📞</span> شماره‌های هشدار</h3>
+        <label>شماره ۱</label><input id="ph1" maxlength="11" placeholder="09xxxxxxxxx">
+        <label>شماره ۲</label><input id="ph2" maxlength="11" placeholder="09xxxxxxxxx">
+        <label>شماره ۳</label><input id="ph3" maxlength="11" placeholder="09xxxxxxxxx">
+        <div class="row" style="margin-top:10px"><span>اعتبار فعلی</span><b id="sim-credit2">--</b></div>
+        <button class="btn" onclick="saveSim()" style="margin-top:14px;width:100%">ذخیره شماره‌ها</button>
+      </div>
+      <div class="card">
+        <h3><span class="ico">🔔</span> هشدارهایی که پیام/تماس می‌دهند</h3>
+        <div class="checks" id="sim-alarms"></div>
+        <button class="btn" onclick="saveSim()" style="margin-top:14px;width:100%">ذخیره هشدارها</button>
+        <div class="hint">این تنظیمات روی برد اصلی (STM32) ذخیره می‌شود و برای آن ارسال می‌گردد.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= server ================= -->
+  <section id="tab-srv">
+    <div class="grid">
+      <div class="card">
+        <h3><span class="ico">☁</span> تنظیمات سرور مرکزی</h3>
+        <label>آدرس سرور</label>
+        <input id="sv-domain" placeholder="example.com">
+        <label>تعداد ارسال داده در ساعت</label>
+        <select id="sv-rate">
+          <option value="1">۱ بار</option><option value="2">۲ بار</option>
+          <option value="3">۳ بار</option><option value="4">۴ بار</option>
+          <option value="6">۶ بار</option><option value="12">۱۲ بار</option>
+          <option value="20">۲۰ بار</option><option value="30">۳۰ بار</option>
+          <option value="60">۶۰ بار</option>
+        </select>
+        <button class="btn" onclick="saveServer()" style="margin-top:14px;width:100%">اعمال و ذخیره</button>
+        <div class="hint">تنظیمات سرور روی ESP32 ذخیره می‌شود و به برد اصلی هم منتقل می‌گردد.</div>
+      </div>
+      <div class="card">
+        <h3><span class="ico">📡</span> تست ارتباط</h3>
+        <div class="row"><span>وضعیت</span><b id="ping-res">تست نشده</b></div>
+        <div class="row"><span>آخرین تست خودکار</span><b id="ping-auto">--</b></div>
+        <button class="btn grn" id="ping-btn" onclick="pingServer()" style="margin-top:14px;width:100%">تست پینگ سرور</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- device settings modal -->
+<div class="modal" id="modal">
+  <div class="mbox">
+    <h3 id="m-title">دستگاه</h3>
+    <div class="sub" id="m-sub"></div>
+    <div class="grid2">
+      <div><label>تنظیم دما (°C)</label><input type="number" id="m-sp-t" step="0.1" min="20" max="45"></div>
+      <div><label>تنظیم رطوبت (%)</label><input type="number" id="m-sp-h" step="0.1" min="0" max="95"></div>
+    </div>
+    <label style="margin-top:14px">آلارم‌های فعال این دستگاه</label>
+    <div class="checks" id="m-alarms"></div>
+    <label style="margin-top:14px;display:flex;align-items:center;gap:9px;cursor:pointer">
+      <input type="checkbox" id="m-paired" style="width:auto;accent-color:var(--acc2)"> اتصال دستگاه فعال باشد
+    </label>
+    <div class="mrow">
+      <button class="btn sec" onclick="closeModal()">انصراف</button>
+      <button class="btn" onclick="saveDevice()">ذخیره و ارسال</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+'use strict';
+const ALARMS = ["دمای بالا","دمای پایین","رطوبت بالا","رطوبت پایین","خرابی هیتر",
+                "خرابی فن رطوبت","خرابی سنسور","قطع برق","خاموشی دستگاه"];
+const FORCED = [6,8];               // sensor + offline cannot be disabled
+const ROTS   = ["خراب","چپ","راست"];
+let S = null, editId = 0;
+
+const $ = id => document.getElementById(id);
+
+/* ---------- tabs ---------- */
+function tab(name){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('act',b.dataset.tab===name));
+  document.querySelectorAll('section').forEach(s=>s.classList.toggle('act',s.id==='tab-'+name));
+}
+
+/* ---------- toast ---------- */
+function toast(msg, ok=true){
+  const t = document.createElement('div');
+  t.className = 'toast '+(ok?'ok':'err');
+  t.textContent = msg;
+  $('toasts').appendChild(t);
+  setTimeout(()=>t.remove(), 3500);
+}
+
+/* ---------- render ---------- */
+function alarmList(mask, en){
+  const out = [];
+  for(let i=0;i<ALARMS.length;i++)
+    if(mask & (1<<i)) out.push(`<span class="al">${ALARMS[i]}${(en!==undefined&&!(en&(1<<i)))?' (خاموش)':''}</span>`);
+  return out.join('');
+}
+
+function render(){
+  if(!S) return;
+  const stm = S.link.stm32;
+  $('stale').style.display = stm ? 'none' : 'block';
+
+  // header chips
+  setDot('c-stm', stm);
+  setDot('c-wifi', S.wifi.connected);
+  $('c-wifi-t').textContent = S.wifi.connected ? S.wifi.ssid : (S.wifi.ssid ? 'قطع' : 'تنظیم نشده');
+  setDot('c-sim', S.sim.ok);
+  setDot('c-srv', S.server.ok);
+
+  // hub cards
+  $('w-st').textContent = S.wifi.connected ? 'متصل' : (S.wifi.ssid ? 'در حال تلاش / قطع' : 'تنظیم نشده');
+  $('w-ssid').textContent = S.wifi.ssid || '--';
+  $('w-ip').textContent = S.wifi.ip || '--';
+  $('s-st').textContent = S.sim.ok ? 'آماده' : 'خطا / بی‌پاسخ';
+  $('s-credit').textContent = fmtCredit(S.sim.credit);
+  $('s-count').textContent = S.sim.phones.filter(p=>p).length + ' شماره';
+  $('v-domain').textContent = S.server.domain;
+  $('v-rate').textContent = 'هر ساعت ' + fa(S.server.rate) + ' بار';
+  $('v-ping').innerHTML = S.server.ok
+    ? '<span style="color:var(--ok)">برقرار</span>' : '<span style="color:var(--err)">قطع</span>';
+
+  // wifi tab
+  $('wf-cur').textContent = S.wifi.connected ? 'متصل به ' + S.wifi.ssid : 'قطع';
+  $('wf-ap').textContent = S.wifi.ap;
+  $('wf-ip').textContent = S.wifi.ip || '--';
+  $('ping-auto').textContent = S.server.ok ? 'برقرار' : 'قطع / بی‌پاسخ';
+
+  // sim tab (only when empty to not fight typing)
+  if(document.activeElement.id !== 'ph1' && document.activeElement.id !== 'ph2' && document.activeElement.id !== 'ph3'){
+    $('ph1').value = S.sim.phones[0] || '';
+    $('ph2').value = S.sim.phones[1] || '';
+    $('ph3').value = S.sim.phones[2] || '';
+  }
+  $('sim-credit2').textContent = fmtCredit(S.sim.credit);
+  drawChecks('sim-alarms', S.sim.mask, null);
+
+  // server tab
+  if(document.activeElement.id !== 'sv-domain') $('sv-domain').value = S.server.domain;
+  $('sv-rate').value = String(S.server.rate);
+
+  renderDevices();
+}
+
+function renderDevices(){
+  const g = $('devgrid');
+  if(!g.dataset.built){
+    g.dataset.built = 1;
+    g.innerHTML = S.devices.map(()=>`
+      <div class="dev" id="dev">
+        <div class="top"><span class="name"></span><span class="badge"></span></div>
+        <div class="vals">
+          <div class="metric"><small>دما</small><b class="t">--</b><i class="ts"></i></div>
+          <div class="metric"><small>رطوبت</small><b class="h">--</b><i class="hs"></i></div>
+        </div>
+        <div class="alarms"></div>
+        <div class="foot"><span class="rot"></span><button class="btn sec sm">تنظیمات</button></div>
+      </div>`).join('');
+    g.querySelectorAll('.dev').forEach((el,i)=>{
+      el.querySelector('button').onclick = ()=>openModal(i);
+    });
+  }
+  let online = 0;
+  S.devices.forEach((d,i)=>{
+    const el = g.children[i];
+    el.className = 'dev' + (!d.online?' off':'') + (d.online && d.alarms ? ' bad':'');
+    el.querySelector('.name').textContent = 'دستگاه ' + fa(d.id);
+    const b = el.querySelector('.badge');
+    if(!d.online){ b.className='badge dim'; b.textContent='آفلاین'; }
+    else if(d.alarms){ b.className='badge err'; b.textContent='خطا'; online++; }
+    else { b.className='badge ok'; b.textContent='آنلاین'; online++; }
+    el.querySelector('.t').textContent = d.online ? d.temp.toFixed(1)+'°' : '--';
+    el.querySelector('.h').textContent = d.online ? d.hum.toFixed(1)+'%' : '--';
+    el.querySelector('.ts').textContent = 'تنظیم: ' + d.sp_t.toFixed(1);
+    el.querySelector('.hs').textContent = 'تنظیم: ' + d.sp_h.toFixed(1);
+    el.querySelector('.alarms').innerHTML = d.online ? alarmList(d.alarms, d.en) : '';
+    el.querySelector('.rot').textContent = 'چرخش: ' + ROTS[d.rot];
+  });
+  $('dev-count').textContent = fa(online) + '/۸ آنلاین';
+}
+
+function setDot(id, on){ $(id).className = 'dot ' + (on ? 'on' : 'off'); }
+function fa(n){ return String(n).replace(/\d/g, d=>'۰۱۲۳۴۵۶۷۸۹'[d]); }
+function fmtCredit(c){ return c ? fa(c.toLocaleString('en-US')) + ' تومان' : '--'; }
+
+/* ---------- alarm checkboxes ---------- */
+function drawChecks(container, mask, disabledBits){
+  const el = $(container);
+  if(el.dataset.mask === String(mask) && el.dataset.built) return;
+  el.dataset.built = 1;
+  el.dataset.mask = String(mask);
+  el.innerHTML = ALARMS.map((name,i)=>{
+    const forced = disabledBits === null ? false : disabledBits.includes(i);
+    const on = forced ? true : !!(mask & (1<<i));
+    return `<label class="chk${forced?' dis':''}">
+      <input type="checkbox" data-i="${i}" ${on?'checked':''} ${forced?'disabled':''}> ${name}${forced?' (همیشه فعال)':''}
+    </label>`;
+  }).join('');
+}
+function readChecks(container){
+  let m = 0;
+  $(container).querySelectorAll('input').forEach(c=>{ if(c.checked) m |= (1<<+c.dataset.i); });
+  return m;
+}
+
+/* ---------- modal ---------- */
+function openModal(i){
+  editId = S.devices[i].id;
+  const d = S.devices[i];
+  $('m-title').textContent = 'تنظیمات دستگاه ' + fa(editId);
+  $('m-sub').textContent = d.online
+    ? `دمای فعلی ${d.temp.toFixed(1)}° - رطوبت فعلی ${d.hum.toFixed(1)}%` : 'دستگاه آفلاین است';
+  $('m-sp-t').value = d.sp_t.toFixed(1);
+  $('m-sp-h').value = d.sp_h.toFixed(1);
+  $('m-paired').checked = d.paired;
+  delete $('m-alarms').dataset.built;
+  $('m-alarms').dataset.mask = '';
+  drawChecks('m-alarms', d.en, FORCED);
+  $('modal').classList.add('open');
+}
+function closeModal(){ $('modal').classList.remove('open'); }
+
+/* ---------- actions ---------- */
+async function post(url, body){
+  try{
+    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    return (await r.json()).ok === true;
+  }catch(e){ return false; }
+}
+
+async function saveWifi(){
+  const ssid = $('wf-list').value;
+  const pass = $('wf-pass').value;
+  if(!ssid) return toast('ابتدا شبکه را انتخاب کنید', false);
+  $('wf-conn').disabled = true;
+  const ok = await post('/api/wifi', {ssid, pass});
+  $('wf-conn').disabled = false;
+  toast(ok ? 'در حال اتصال به ' + ssid + ' ...' : 'ارسال ناموفق', ok);
+}
+
+async function scanWifi(){
+  $('wf-scan').disabled = true;
+  $('wf-scan').textContent = 'در حال اسکن...';
+  try{
+    const r = await fetch('/api/scan');
+    const d = await r.json();
+    const sel = $('wf-list');
+    sel.innerHTML = d.networks.length
+      ? d.networks.map(n=>`<option value="${n}">${n}</option>`).join('')
+      : '<option value="">شبکه‌ای پیدا نشد</option>';
+  }catch(e){ toast('اسکن ناموفق', false); }
+  $('wf-scan').disabled = false;
+  $('wf-scan').textContent = 'اسکن شبکه‌های اطراف';
+}
+
+async function saveSim(){
+  const ok = await post('/api/sim', {
+    p1:$('ph1').value.trim(), p2:$('ph2').value.trim(), p3:$('ph3').value.trim(),
+    mask:readChecks('sim-alarms')
+  });
+  toast(ok ? 'تنظیمات سیم‌کارت ذخیره و به برد اصلی ارسال شد' : 'ارسال ناموفق', ok);
+}
+
+async function saveServer(){
+  const ok = await post('/api/server', {domain:$('sv-domain').value.trim(), rate:+$('sv-rate').value});
+  toast(ok ? 'تنظیمات سرور ذخیره شد' : 'ارسال ناموفق', ok);
+}
+
+async function pingServer(){
+  $('ping-btn').disabled = true;
+  $('ping-res').textContent = '...در حال تست';
+  try{
+    const r = await fetch('/api/ping');
+    const d = await r.json();
+    $('ping-res').innerHTML = d.ok
+      ? '<span style="color:var(--ok)">برقرار است</span>'
+      : '<span style="color:var(--err)">پاسخی دریافت نشد</span>';
+  }catch(e){ $('ping-res').textContent = 'خطا'; }
+  $('ping-btn').disabled = false;
+}
+
+async function saveDevice(){
+  const ok = await post('/api/device', {
+    id:editId, sp_t:+$('m-sp-t').value, sp_h:+$('m-sp-h').value,
+    mask:readChecks('m-alarms'), paired:$('m-paired').checked
+  });
+  closeModal();
+  toast(ok ? 'تنظیمات دستگاه ذخیره و ارسال شد' : 'ارسال ناموفق', ok);
+}
+
+/* ---------- poll ---------- */
+async function poll(){
+  try{
+    const r = await fetch('/api/state');
+    S = await r.json();
+    render();
+  }catch(e){
+    setDot('c-stm', false); setDot('c-wifi', false); setDot('c-sim', false); setDot('c-srv', false);
+  }
+}
+$('modal').addEventListener('click', e=>{ if(e.target.id==='modal') closeModal(); });
+poll();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>
