@@ -98,6 +98,13 @@ static void scan_service()
         strlcat(list, hub.scan_list[i], sizeof(list));
     }
     uart_send("WIFI:SCAN_RES:%s", list);
+
+    if (WiFi.status() == WL_CONNECTED)
+    {
+        connecting = false;
+        report(true);
+    }
+    
 }
 
 static void connect_service()
