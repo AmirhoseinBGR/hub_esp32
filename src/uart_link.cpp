@@ -142,6 +142,8 @@ static void handle_legacy(const char *line)
             strlcpy(pass, colon + 1, sizeof(pass));
         }
         else strlcpy(ssid, rest, sizeof(ssid));
+        Serial.println(ssid);
+        Serial.println(pass);
         if (apply_wifi(ssid, pass, true))
         {
             store_save_wifi();
