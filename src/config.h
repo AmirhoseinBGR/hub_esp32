@@ -45,3 +45,7 @@
 #define PING_PERIOD_MS 60000
 // How often ESP32 re-announces WIFI:STATUS to STM32 (ms)
 #define WIFI_STATUS_PERIOD_MS 8000
+// WiFi scan: first attempt often races STA connect — retry before giving up
+#define WIFI_SCAN_RETRIES 3
+#define WIFI_SCAN_RETRY_DELAY_MS 600
+#define WIFI_SCAN_MAX_MS_PER_CHAN 400

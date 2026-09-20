@@ -29,6 +29,13 @@ static uint32_t last_retry = 0;
 static uint32_t last_status_ms = 0;
 static volatile bool ping_busy = false;
 
+// Scan retry state — first scan often fails/returns empty while STA associates.
+static uint8_t scan_attempts = 0;
+static bool scan_retry_pending = false;
+static uint32_t scan_retry_at = 0;
+
+static void scan_start_one(void);
+
 static void report(bool connected)
 {
     hub.wifi_connected = connected;
@@ -111,10 +118,33 @@ void net_start_connect()
 
 void net_scan_start()
 {
-    if (hub.scanning) return;
+    if (hub.scanning || scan_retry_pending) return;
 
+    scan_attempts = 0;
+    scan_start_one();
+}
+
+static void scan_schedule_retry()
+{
+    scan_attempts++;
+    if (scan_attempts >= WIFI_SCAN_RETRIES)
+    {
+        hub.scan_count = 0;
+        uart_send("WIFI:SCAN_RES:");
+        return;
+    }
+
+    scan_retry_pending = true;
+    scan_retry_at      = millis() + WIFI_SCAN_RETRY_DELAY_MS;
+}
+
+static void scan_start_one()
+{
+    scan_retry_pending = false;
     WiFi.scanDelete();
-    const int r = WiFi.scanNetworks(true, false);
+
+    // Longer dwell per channel finds weak APs the default pass misses.
+    const int r = WiFi.scanNetworks(true, false, false, WIFI_SCAN_MAX_MS_PER_CHAN);
 
     if (r == WIFI_SCAN_RUNNING)
     {
@@ -122,10 +152,9 @@ void net_scan_start()
         return;
     }
 
-    /* Sync success or hard failure: never leave hub.scanning stuck true. */
     hub.scanning = false;
 
-    if (r >= 0)
+    if (r > 0)
     {
         hub.scan_count = 0;
         for (int i = 0; i < r && hub.scan_count < SCAN_MAX; i++)
@@ -135,17 +164,23 @@ void net_scan_start()
             strlcpy(hub.scan_list[hub.scan_count++], ssid.c_str(), 33);
         }
         WiFi.scanDelete();
+        scan_attempts = 0;
         net_send_scan_cache();
+        return;
     }
-    else
-    {
-        hub.scan_count = 0;
-        uart_send("WIFI:SCAN_RES:");
-    }
+
+    // r == 0 (empty) or r < 0 (failed): retry before telling STM32 there is nothing.
+    scan_schedule_retry();
 }
 
 static void scan_service()
 {
+    if (scan_retry_pending)
+    {
+        if ((int32_t)(millis() - scan_retry_at) >= 0) scan_start_one();
+        return;
+    }
+
     if (!hub.scanning) return;
 
     const int8_t r = WiFi.scanComplete();
@@ -153,11 +188,10 @@ static void scan_service()
 
     hub.scanning = false;
 
-    if (r < 0)
+    if (r <= 0)
     {
-        hub.scan_count = 0;
         WiFi.scanDelete();
-        uart_send("WIFI:SCAN_RES:");
+        scan_schedule_retry();
         return;
     }
 
@@ -170,6 +204,15 @@ static void scan_service()
     }
 
     WiFi.scanDelete();
+
+    // Truly empty after a "successful" complete still counts as a miss — retry.
+    if (hub.scan_count == 0)
+    {
+        scan_schedule_retry();
+        return;
+    }
+
+    scan_attempts = 0;
     net_send_scan_cache();
 
     if (WiFi.status() == WL_CONNECTED)
