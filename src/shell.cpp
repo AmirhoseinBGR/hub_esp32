@@ -1,11 +1,12 @@
-/** shell.cpp - USB serial shell: local commands + GSM CLI passthrough commands. */
+/** shell.cpp - USB serial shell: local commands + GSM CLI passthrough. */
 #include "shell.h"
+#include "gsm_log.h"
 #include "hub.h"
 #include "net.h"
 #include "store.h"
 #include "uart_link.h"
 
-static char line[128];
+static char line[192];
 static uint16_t len = 0;
 
 static void help()
@@ -14,8 +15,13 @@ static void help()
     Serial.println("state                dump full state JSON");
     Serial.println("wifi <ssid> <pass>   set + save WiFi");
     Serial.println("server <domain>      set + save server domain");
-    Serial.println("<gsm cmd>            sms 0912... text | dial 0912... | ussd *140# |");
-    Serial.println("                     at AT+CSQ | i s r d b p x h R K L | q ...");
+    Serial.println("mirror on|off        toggle GSM log echo to serial");
+    Serial.println("--- GSM CLI (forwarded to STM32 modem) ---");
+    Serial.println("sms <num> <text>     send SMS");
+    Serial.println("dial <num>           make a call");
+    Serial.println("ussd <code>          send USSD code");
+    Serial.println("at <cmd>             raw AT command");
+    Serial.println("i s r d b p x h R K L  modem menu keys");
 }
 
 static void run(const char *cmd)
@@ -30,6 +36,14 @@ static void run(const char *cmd)
         hub_to_json(doc);
         serializeJsonPretty(doc, Serial);
         Serial.println();
+        return;
+    }
+
+    if (strncmp(cmd, "mirror ", 7) == 0)
+    {
+        bool on = strcmp(cmd + 7, "on") == 0;
+        gsm_log_mirror_serial(on);
+        Serial.printf("GSM log mirror %s\n", on ? "on" : "off");
         return;
     }
 
@@ -62,8 +76,9 @@ static void run(const char *cmd)
         return;
     }
 
-    // everything else goes to the GSM CLI on the STM32
+    // forward to STM32 GSM CLI
     uart_send("GSM:CMD|%s", cmd);
+    Serial.printf("[GSM-CMD] %s\n", cmd);
 }
 
 void shell_begin() { Serial.println("shell ready - type help"); }
@@ -86,6 +101,10 @@ void shell_poll()
         {
             line[len++] = c;
         }
-        else len = 0;
+        else
+        {
+            len = 0;
+            Serial.println("line too long - discarded");
+        }
     }
 }

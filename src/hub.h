@@ -8,7 +8,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
-#define DEV_COUNT 8
+#define DEV_COUNT 16 /* STM32 UI_MACHINE_COUNT / hub_core HUB_DEVICE_COUNT */
 #define PHONE_COUNT 3
 #define SCAN_MAX 12
 #define GSM_PEER_MAX 24

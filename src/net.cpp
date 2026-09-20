@@ -64,7 +64,7 @@ void net_scan_start()
 {
     if (hub.scanning) return;
     WiFi.scanDelete();
-    if (WiFi.scanNetworks(true /*async*/, false) == WIFI_SCAN_RUNNING) hub.scanning = true;
+    if (WiFi.scanNetworks(true, false) == WIFI_SCAN_RUNNING) hub.scanning = true;
 }
 
 static void scan_service()
@@ -72,7 +72,7 @@ static void scan_service()
     if (!hub.scanning) return;
 
     int8_t r = WiFi.scanComplete();
-    if (r == WIFI_SCAN_RUNNING || r == WIFI_SCAN_FAILED) return; // still working
+    if (r == WIFI_SCAN_RUNNING || r == WIFI_SCAN_FAILED) return;
 
     hub.scanning = false;
 
@@ -98,13 +98,11 @@ static void scan_service()
         strlcat(list, hub.scan_list[i], sizeof(list));
     }
     uart_send("WIFI:SCAN_RES:%s", list);
-
     if (WiFi.status() == WL_CONNECTED)
     {
         connecting = false;
         report(true);
     }
-    
 }
 
 static void connect_service()

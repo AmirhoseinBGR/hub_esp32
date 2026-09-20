@@ -16,7 +16,7 @@ static uint8_t head = 0;       // next write slot
 static uint32_t seq = 0;
 static bool mirror = true;
 
-// Strip ANSI escape sequences for clean web display
+// Strip ANSI CSI sequences (ESC [ params final)
 static void strip_ansi(const char *in, char *out, size_t cap)
 {
     size_t o = 0;
@@ -25,7 +25,12 @@ static void strip_ansi(const char *in, char *out, size_t cap)
         if (*p == 0x1B)
         {
             const char *q = p + 1;
-            if (*q == '[') { while (*q && (*q < '@' || *q > '~')) q++; if (*q) q++; }
+            if (*q == '[')
+            {
+                q++;
+                while (*q && (unsigned char)*q >= 0x20 && (unsigned char)*q <= 0x3F) q++;
+                if (*q && (unsigned char)*q >= 0x40 && (unsigned char)*q <= 0x7E) q++;
+            }
             else if (*q) q++;
             p = q - 1;
             continue;
@@ -42,11 +47,12 @@ void gsm_log_add(const char *text)
     LogLine &l = ring[head];
     l.seq = ++seq;
     strip_ansi(text, l.text, sizeof(l.text));
-
     head = (head + 1) % GSM_LOG_LINES;
 
     if (mirror) Serial.printf("[GSM] %s\n", l.text);
 }
+
+uint32_t gsm_log_latest_seq() { return seq; }
 
 void gsm_log_to_json(JsonArray arr, uint32_t after_seq, int max_lines)
 {

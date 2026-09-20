@@ -8,7 +8,7 @@
 #include <HardwareSerial.h>
 
 static HardwareSerial stm(2);
-static char rx_line[LINE_MAX];
+static char rx_line[PROTO_LINE_MAX];
 static uint16_t rx_len = 0;
 
 #ifdef HOST_TEST
@@ -121,15 +121,16 @@ static void handle_gsm_st(char *body)
 
 static void handle_req(char *body)
 {
-    if (strcmp(body, "SCAN") == 0) net_scan_start(); // reply comes when scan finishes
+    if (strcmp(body, "SCAN") == 0)
+        net_scan_start();
     else if (strcmp(body, "PING") == 0)
         uart_send("SERVER:PING_RES:%s", net_ping_server() ? "OK" : "FAIL");
-    else if (strcmp(body, "CREDIT") == 0) uart_send("CREDIT:%ld", (long)hub.sim_credit);
+    else if (strcmp(body, "CREDIT") == 0)
+        uart_send("CREDIT:%ld", (long)hub.sim_credit);
 }
 
 static void handle_legacy(const char *line)
 {
-    // Old colon format, kept so mixed old/new firmware still works
     if (strcmp(line, "WIFI:SCAN") == 0) { net_scan_start(); return; }
     if (strncmp(line, "WIFI:CONNECT:", 13) == 0)
     {
@@ -142,8 +143,6 @@ static void handle_legacy(const char *line)
             strlcpy(pass, colon + 1, sizeof(pass));
         }
         else strlcpy(ssid, rest, sizeof(ssid));
-        Serial.println(ssid);
-        Serial.println(pass);
         if (apply_wifi(ssid, pass, true))
         {
             store_save_wifi();
@@ -174,25 +173,25 @@ static void process_line(const char *line)
     }
     else if (strncmp(line, "GSM:ST|", 7) == 0)
     {
-        char body[LINE_MAX];
+        char body[PROTO_LINE_MAX];
         strlcpy(body, line + 7, sizeof(body));
         handle_gsm_st(body);
     }
     else if (strncmp(line, "SET:", 4) == 0)
     {
-        char body[LINE_MAX];
+        char body[PROTO_LINE_MAX];
         strlcpy(body, line + 4, sizeof(body));
         handle_set(body);
     }
     else if (strncmp(line, "STATE:", 6) == 0)
     {
-        char body[LINE_MAX];
+        char body[PROTO_LINE_MAX];
         strlcpy(body, line + 6, sizeof(body));
         handle_state(body);
     }
     else if (strncmp(line, "REQ:", 4) == 0)
     {
-        char body[LINE_MAX];
+        char body[PROTO_LINE_MAX];
         strlcpy(body, line + 4, sizeof(body));
         handle_req(body);
     }
@@ -226,7 +225,7 @@ void uart_poll()
                 rx_len = 0;
             }
         }
-        else if (rx_len < LINE_MAX - 1)
+        else if (rx_len < PROTO_LINE_MAX - 1)
         {
             rx_line[rx_len++] = c;
         }
@@ -241,7 +240,7 @@ void uart_poll()
 
 void uart_send(const char *fmt, ...)
 {
-    char buf[LINE_MAX];
+    char buf[PROTO_LINE_MAX];
     va_list args;
     va_start(args, fmt);
     vsnprintf(buf, sizeof(buf), fmt, args);

@@ -136,7 +136,7 @@ static void handle_gsm_get()
 {
     uint32_t after = (uint32_t)strtoul(server.arg("after").c_str(), NULL, 10);
     JsonDocument doc;
-    doc["seq"] = hub.gsm.seen ? 1 : 0;
+    doc["seq"] = gsm_log_latest_seq();
     JsonArray logs = doc["logs"].to<JsonArray>();
     gsm_log_to_json(logs, after, 40);
     reply_json(200, doc);

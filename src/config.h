@@ -34,7 +34,7 @@
 #define AP_SSID "ESP32_HUB_AP"
 #define AP_PASS "12345678"
 
-#define LINE_MAX 256
+#define PROTO_LINE_MAX 256
 
 // How long without UART traffic before STM32 is considered offline (ms)
 #define STM32_TIMEOUT_MS 15000
