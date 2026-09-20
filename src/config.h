@@ -43,3 +43,5 @@
 #define WIFI_RETRY_MS 20000
 // Periodic ping of the central server (ms)
 #define PING_PERIOD_MS 60000
+// How often ESP32 re-announces WIFI:STATUS to STM32 (ms)
+#define WIFI_STATUS_PERIOD_MS 8000

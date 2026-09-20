@@ -19,9 +19,14 @@
 #define WL_WRONG_PASSWORD 8
 #endif
 
+#ifndef WIFI_STATUS_PERIOD_MS
+#define WIFI_STATUS_PERIOD_MS 8000u
+#endif
+
 static bool connecting = false;
 static uint32_t connect_start = 0;
 static uint32_t last_retry = 0;
+static uint32_t last_status_ms = 0;
 static volatile bool ping_busy = false;
 
 static void report(bool connected)
@@ -40,6 +45,50 @@ static void report(bool connected)
         hub.wifi_ip[0] = '\0';
         uart_send("WIFI:STATUS:DISCONNECTED");
     }
+}
+
+/** Push current STA state to the STM32 UI. Safe to call at any time. */
+void net_send_wifi_status()
+{
+    last_status_ms = millis();
+
+    if (WiFi.status() == WL_CONNECTED)
+    {
+        hub.wifi_connected = true;
+        hub.wifi_phase = 2;
+        hub.wifi_err = 0;
+        IPAddress ip = WiFi.localIP();
+        strlcpy(hub.wifi_ip, ip.toString().c_str(), sizeof(hub.wifi_ip));
+        uart_send("WIFI:STATUS:CONNECTED:%s",
+                  hub.wifi_ssid[0] != '\0' ? hub.wifi_ssid : WiFi.SSID().c_str());
+    }
+    else if (hub.wifi_phase == 3)
+    {
+        hub.wifi_connected = false;
+        if (hub.wifi_err == 1)
+            uart_send("WIFI:STATUS:FAILED:AUTH");
+        else if (hub.wifi_err == 2)
+            uart_send("WIFI:STATUS:FAILED:TIMEOUT");
+        else
+            uart_send("WIFI:STATUS:FAILED:OTHER");
+    }
+    else
+    {
+        hub.wifi_connected = false;
+        uart_send("WIFI:STATUS:DISCONNECTED");
+    }
+}
+
+/** Push the cached scan list so the device UI can paint immediately. */
+void net_send_scan_cache()
+{
+    char list[220] = "";
+    for (int i = 0; i < hub.scan_count && i < 5; i++)
+    {
+        if (i > 0) strlcat(list, ",", sizeof(list));
+        strlcat(list, hub.scan_list[i], sizeof(list));
+    }
+    uart_send("WIFI:SCAN_RES:%s", list);
 }
 
 void net_begin()
@@ -63,41 +112,66 @@ void net_start_connect()
 void net_scan_start()
 {
     if (hub.scanning) return;
+
     WiFi.scanDelete();
-    if (WiFi.scanNetworks(true, false) == WIFI_SCAN_RUNNING) hub.scanning = true;
+    const int r = WiFi.scanNetworks(true, false);
+
+    if (r == WIFI_SCAN_RUNNING)
+    {
+        hub.scanning = true;
+        return;
+    }
+
+    /* Sync success or hard failure: never leave hub.scanning stuck true. */
+    hub.scanning = false;
+
+    if (r >= 0)
+    {
+        hub.scan_count = 0;
+        for (int i = 0; i < r && hub.scan_count < SCAN_MAX; i++)
+        {
+            String ssid = WiFi.SSID(i);
+            if (ssid.length() == 0) continue;
+            strlcpy(hub.scan_list[hub.scan_count++], ssid.c_str(), 33);
+        }
+        WiFi.scanDelete();
+        net_send_scan_cache();
+    }
+    else
+    {
+        hub.scan_count = 0;
+        uart_send("WIFI:SCAN_RES:");
+    }
 }
 
 static void scan_service()
 {
     if (!hub.scanning) return;
 
-    int8_t r = WiFi.scanComplete();
-    if (r == WIFI_SCAN_RUNNING || r == WIFI_SCAN_FAILED) return;
+    const int8_t r = WiFi.scanComplete();
+    if (r == WIFI_SCAN_RUNNING) return;
 
     hub.scanning = false;
 
-    if (r > 0)
+    if (r < 0)
     {
         hub.scan_count = 0;
-        for (int i = 0; i < r && hub.scan_count < SCAN_MAX; i++)
-        {
-            String ssid = WiFi.SSID(i);
-            if (ssid.length() == 0) continue; // skip hidden
-            strlcpy(hub.scan_list[hub.scan_count++], ssid.c_str(), 33);
-        }
+        WiFi.scanDelete();
+        uart_send("WIFI:SCAN_RES:");
+        return;
     }
-    else hub.scan_count = 0;
+
+    hub.scan_count = 0;
+    for (int i = 0; i < r && hub.scan_count < SCAN_MAX; i++)
+    {
+        String ssid = WiFi.SSID(i);
+        if (ssid.length() == 0) continue; // skip hidden
+        strlcpy(hub.scan_list[hub.scan_count++], ssid.c_str(), 33);
+    }
 
     WiFi.scanDelete();
+    net_send_scan_cache();
 
-    // push to STM32 device UI (device WiFi page)
-    char list[220] = "";
-    for (int i = 0; i < hub.scan_count && i < 5; i++)
-    {
-        if (i > 0) strlcat(list, ",", sizeof(list));
-        strlcat(list, hub.scan_list[i], sizeof(list));
-    }
-    uart_send("WIFI:SCAN_RES:%s", list);
     if (WiFi.status() == WL_CONNECTED)
     {
         connecting = false;
@@ -161,6 +235,11 @@ void net_service()
         if (hub.wifi_phase != 3) hub.wifi_phase = 0; // keep a fresh failure reason
         uart_send("WIFI:STATUS:DISCONNECTED");
     }
+
+    /* Periodic STATUS so the device Wi-Fi page can restore "متصل به X"
+     * after re-entering even if the board was already up before STM32 booted. */
+    if (millis() - last_status_ms >= WIFI_STATUS_PERIOD_MS)
+        net_send_wifi_status();
 }
 
 bool net_ping_server()

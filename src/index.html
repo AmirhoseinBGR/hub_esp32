@@ -45,10 +45,10 @@ button:hover{background:var(--primary-hover)}
   </header>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="showTab('dash')">📊 وضعیت لحظه‌ای دستگاه‌ها</button>
-    <button class="tab-btn" onclick="showTab('wifi')">📶 تنظیمات وای‌فای</button>
-    <button class="tab-btn" onclick="showTab('sim')">📱 سیم‌کارت و تماس</button>
-    <button class="tab-btn" onclick="showTab('server')">☁ سرور مرکزی و همگام‌سازی</button>
+    <button class="tab-btn active" onclick="showTab('dash', this)">📊 وضعیت لحظه‌ای دستگاه‌ها</button>
+    <button class="tab-btn" onclick="showTab('wifi', this)">📶 تنظیمات وای‌فای</button>
+    <button class="tab-btn" onclick="showTab('sim', this)">📱 سیم‌کارت و تماس</button>
+    <button class="tab-btn" onclick="showTab('server', this)">☁ سرور مرکزی و همگام‌سازی</button>
   </div>
 
   <!-- تب وضعیت دستگاه‌ها -->
@@ -90,7 +90,8 @@ button:hover{background:var(--primary-hover)}
   <div id="wifi" class="tab-content">
     <div class="card">
       <h3>اسکن و اتصال به شبکه وای‌فای</h3>
-      <button class="btn-secondary" onclick="scanWifi()">🔍 اسکن شبکه‌های اطراف</button>
+      <button class="btn-secondary" onclick="scanWifi(true)">🔍 اسکن شبکه‌های اطراف</button>
+      <div id="wifi-scan-hint" style="color:var(--text-dim);font-size:0.85rem;margin:6px 0"></div>
       <label>شبکه مورد نظر (SSID):</label>
       <select id="wifi-select"><option value="">-- اسکن کنید --</option></select>
       <label>رمز عبور شبکه:</label>
@@ -133,67 +134,144 @@ button:hover{background:var(--primary-hover)}
 </div>
 
 <script>
-function showTab(id){
+function showTab(id, btn){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
-  event.target.classList.add('active');
+  if(btn) btn.classList.add('active');
   document.getElementById(id).classList.add('active');
 }
-function scanWifi(){
-  fetch('/api/wifi/scan').then(r=>r.json()).then(data=>{
-    let sel = document.getElementById('wifi-select');
-    sel.innerHTML = '';
-    data.networks.forEach(net=>{
-      let opt = document.createElement('option');
-      opt.value = net; opt.innerText = net;
-      sel.appendChild(opt);
-    });
+
+function apiGet(path){
+  return fetch(path).then(r=>r.json());
+}
+function apiPost(path, body){
+  return fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+    .then(r=>r.json());
+}
+
+function renderScan(data){
+  const sel = document.getElementById('wifi-select');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">-- اسکن کنید --</option>';
+  (data.networks || []).forEach(net=>{
+    const opt = document.createElement('option');
+    opt.value = net; opt.innerText = net;
+    sel.appendChild(opt);
+  });
+  if(cur) sel.value = cur;
+  const hint = document.getElementById('wifi-scan-hint');
+  if(hint) hint.innerText = data.scanning ? '...در حال جستجو' : ((data.networks||[]).length ? '' : 'شبکه‌ای پیدا نشد');
+}
+
+function scanWifi(refresh){
+  const url = refresh ? '/api/scan?refresh=1' : '/api/scan';
+  apiGet(url).then(data=>{
+    renderScan(data);
+    if(data.scanning){
+      setTimeout(()=>scanWifi(false), 1200);
+    }
+  }).catch(()=>{
+    const hint = document.getElementById('wifi-scan-hint');
+    if(hint) hint.innerText = 'خطا در اسکن';
   });
 }
+
 function connectWifi(){
-  let ssid = document.getElementById('wifi-select').value;
-  let pass = document.getElementById('wifi-pass').value;
-  fetch('/api/wifi/connect', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ssid, pass})})
-  .then(r=>r.json()).then(res=>{ alert(res.msg); loadStatus(); });
+  const ssid = document.getElementById('wifi-select').value;
+  const pass = document.getElementById('wifi-pass').value;
+  if(!ssid){ alert('ابتدا یک شبکه را انتخاب کنید'); return; }
+  apiPost('/api/wifi', {ssid, pass}).then(res=>{
+    alert(res && res.ok ? 'در حال اتصال...' : 'اتصال ناموفق بود');
+    setTimeout(loadStatus, 2000);
+  }).catch(()=>alert('خطا در ارسال درخواست'));
 }
+
 function testServerPing(){
   document.getElementById('srv-ping-status').innerText = '...در حال ارسال پینگ';
-  fetch('/api/server/ping').then(r=>r.json()).then(res=>{
-    let el = document.getElementById('srv-ping-status');
+  apiGet('/api/ping').then(res=>{
+    const el = document.getElementById('srv-ping-status');
     el.innerText = res.ok ? 'ارتباط برقرار است (OK)' : 'خطا در برقراری ارتباط (Error)';
     el.style.color = res.ok ? 'var(--success)' : 'var(--danger)';
+  }).catch(()=>{
+    const el = document.getElementById('srv-ping-status');
+    el.innerText = 'خطا در درخواست';
+    el.style.color = 'var(--danger)';
   });
 }
+
 function saveSim(){
-  let p1 = document.getElementById('sim-p1').value;
-  let p2 = document.getElementById('sim-p2').value;
-  let p3 = document.getElementById('sim-p3').value;
-  fetch('/api/sim/save', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({p1, p2, p3})})
-  .then(r=>r.json()).then(res=>alert(res.msg));
+  const p1 = document.getElementById('sim-p1').value;
+  const p2 = document.getElementById('sim-p2').value;
+  const p3 = document.getElementById('sim-p3').value;
+  apiPost('/api/sim', {p1, p2, p3, mask: 0x00AF}).then(res=>{
+    alert(res && res.ok ? 'ذخیره شد' : 'ذخیره نشد');
+    loadStatus();
+  }).catch(()=>alert('خطا در ذخیره'));
 }
+
 function saveServer(){
-  let domain = document.getElementById('server-input-domain').value;
-  let rate = document.getElementById('server-input-rate').value;
-  fetch('/api/server/save', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({domain, rate})})
-  .then(r=>r.json()).then(res=>alert(res.msg));
+  const domain = document.getElementById('server-input-domain').value;
+  const rate = parseInt(document.getElementById('server-input-rate').value, 10) || 12;
+  apiPost('/api/server', {domain, rate}).then(res=>{
+    alert(res && res.ok ? 'اعمال شد' : 'اعمال نشد');
+    loadStatus();
+  }).catch(()=>alert('خطا در ارسال'));
 }
+
 function loadStatus(){
-  fetch('/api/status').then(r=>r.json()).then(s=>{
-    if(s.sim_ok){
-      document.getElementById('sim-status-badge').className = 'status-pill status-ok';
-      document.getElementById('sim-status-badge').innerText = 'وضعیت سیم‌کارت: فعال';
-      document.getElementById('gsm-state').innerText = 'آماده (Ready)';
-    } else {
-      document.getElementById('sim-status-badge').className = 'status-pill status-err';
-      document.getElementById('sim-status-badge').innerText = 'وضعیت سیم‌کارت: غیرفعال یا خطا';
-      document.getElementById('gsm-state').innerText = 'عدم دسترسی';
+  apiGet('/api/state').then(s=>{
+    const simOk = !!(s.sim && s.sim.ok);
+    const badge = document.getElementById('sim-status-badge');
+    badge.className = 'status-pill ' + (simOk ? 'status-ok' : 'status-err');
+    badge.innerText = simOk ? 'وضعیت سیم‌کارت: فعال' : 'وضعیت سیم‌کارت: غیرفعال یا خطا';
+    document.getElementById('gsm-state').innerText = simOk ? 'آمایه (Ready)' : 'عدم دسترسی';
+    document.getElementById('sim-credit').innerText = ((s.sim && s.sim.credit) || 0) + ' تومان';
+
+    const wifi = s.wifi || {};
+    const wifiEl = document.getElementById('wifi-cur-ssid');
+    if(wifi.connected && wifi.ssid) wifiEl.innerText = wifi.ssid + ' (متصل)';
+    else if(wifi.ssid) wifiEl.innerText = wifi.ssid + ' (قطع)';
+    else wifiEl.innerText = 'عدم اتصال';
+
+    if(s.server && s.server.domain) document.getElementById('srv-domain').innerText = s.server.domain;
+    if(s.server && s.server.rate) document.getElementById('srv-rate').innerText = s.server.rate + ' بار در ساعت';
+    const pingEl = document.getElementById('srv-ping-status');
+    if(s.server){
+      pingEl.innerText = s.server.ok ? 'پاسخ دریافت شد (OK)' : 'پاسخ دریافت نشد';
+      pingEl.style.color = s.server.ok ? 'var(--success)' : 'var(--danger)';
     }
-    if(s.wifi_ssid){ document.getElementById('wifi-cur-ssid').innerText = s.wifi_ssid; }
-    if(s.sim_p1) document.getElementById('sim-p1').value = s.sim_p1;
-    if(s.sim_p2) document.getElementById('sim-p2').value = s.sim_p2;
-    if(s.sim_p3) document.getElementById('sim-p3').value = s.sim_p3;
+
+    const stmEl = document.getElementById('stm-link');
+    if(stmEl){
+      const stmOk = !!(s.link && s.link.stm32);
+      stmEl.innerText = stmOk ? 'متصل (UART6)' : 'قطع';
+      stmEl.style.color = stmOk ? 'var(--success)' : 'var(--danger)';
+    }
+
+    if(s.sim && s.sim.phones){
+      if(s.sim.phones[0]) document.getElementById('sim-p1').value = s.sim.phones[0];
+      if(s.sim.phones[1]) document.getElementById('sim-p2').value = s.sim.phones[1];
+      if(s.sim.phones[2]) document.getElementById('sim-p3').value = s.sim.phones[2];
+    }
+
+    const body = document.getElementById('devices-body');
+    if(body && s.devices){
+      body.innerHTML = '';
+      s.devices.forEach(d=>{
+        const tr = document.createElement('tr');
+        const online = d.online ? '<span class="badge badge-active">آنلاین</span>' : '<span class="badge badge-inactive">آفلاین</span>';
+        const rot = d.rotation === 1 ? 'چپ' : (d.rotation === 2 ? 'راست' : 'خطا');
+        const alarms = d.alarms ? 'فعال' : 'عادی';
+        tr.innerHTML = '<td>دستگاه ' + d.id + '</td><td>' + online + '</td><td>' +
+          (d.online ? d.temp : '--') + '</td><td>' + d.sp_t + '</td><td>' +
+          (d.online ? d.hum : '--') + '</td><td>' + d.sp_h + '</td><td>' + rot +
+          '</td><td>' + alarms + '</td>';
+        body.appendChild(tr);
+      });
+    }
   }).catch(()=>{});
 }
+
 setInterval(loadStatus, 4000);
 loadStatus();
 </script>

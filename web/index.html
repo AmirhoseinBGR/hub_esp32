@@ -336,7 +336,8 @@ const $=id=>document.getElementById(id);
 function tab(name){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('act',b.dataset.tab===name));
   document.querySelectorAll('section').forEach(s=>s.classList.toggle('act',s.id==='tab-'+name));
-  if(name==='wifi'&&!wifiAutoScanned){wifiAutoScanned=true;scanWifi();}
+  // Always refresh when opening Wi-Fi: the device page expects a live scan too.
+  if(name==='wifi'&&!scanning)scanWifi();
   if(name==='gsm'&&!termTimer)termTimer=setInterval(pollTerm,1200);
 }
 function toast(msg,ok=true){

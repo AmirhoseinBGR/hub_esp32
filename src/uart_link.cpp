@@ -6,6 +6,7 @@
 #include "net.h"
 #include "store.h"
 #include <HardwareSerial.h>
+#include <WiFi.h>
 
 static HardwareSerial stm(2);
 static char rx_line[PROTO_LINE_MAX];
@@ -40,11 +41,15 @@ static void handle_set(char *body)
 
     if (n >= 4 && strcmp(f[0], "WIFI") == 0)
     {
-        if (apply_wifi(f[1], f[2], atoi(f[3]) != 0))
-        {
-            store_save_wifi();
+        const bool changed = apply_wifi(f[1], f[2], atoi(f[3]) != 0);
+        if (changed) store_save_wifi();
+
+        // Same credentials but link down (missed STATUS / keepalive echo)
+        // must still retry — otherwise SET:WIFI is a silent no-op.
+        if (changed || (hub.wifi_ssid[0] != '\0' && WiFi.status() != WL_CONNECTED))
             net_start_connect();
-        }
+
+        net_send_wifi_status();
     }
     else if (n >= 3 && strcmp(f[0], "SERVER") == 0)
     {
@@ -122,7 +127,13 @@ static void handle_gsm_st(char *body)
 static void handle_req(char *body)
 {
     if (strcmp(body, "SCAN") == 0)
+    {
+        // Device WiFi page opened: status first so "متصل به X" paints
+        // immediately, then any cached list, then a fresh scan.
+        net_send_wifi_status();
+        if (hub.scan_count > 0 && !hub.scanning) net_send_scan_cache();
         net_scan_start();
+    }
     else if (strcmp(body, "PING") == 0)
         uart_send("SERVER:PING_RES:%s", net_ping_server() ? "OK" : "FAIL");
     else if (strcmp(body, "CREDIT") == 0)
@@ -131,7 +142,13 @@ static void handle_req(char *body)
 
 static void handle_legacy(const char *line)
 {
-    if (strcmp(line, "WIFI:SCAN") == 0) { net_scan_start(); return; }
+    if (strcmp(line, "WIFI:SCAN") == 0)
+    {
+        net_send_wifi_status();
+        if (hub.scan_count > 0 && !hub.scanning) net_send_scan_cache();
+        net_scan_start();
+        return;
+    }
     if (strncmp(line, "WIFI:CONNECT:", 13) == 0)
     {
         const char *rest = line + 13;
@@ -143,11 +160,10 @@ static void handle_legacy(const char *line)
             strlcpy(pass, colon + 1, sizeof(pass));
         }
         else strlcpy(ssid, rest, sizeof(ssid));
-        if (apply_wifi(ssid, pass, true))
-        {
-            store_save_wifi();
+        const bool changed = apply_wifi(ssid, pass, true);
+        if (changed) store_save_wifi();
+        if (changed || (hub.wifi_ssid[0] != '\0' && WiFi.status() != WL_CONNECTED))
             net_start_connect();
-        }
         return;
     }
     if (strncmp(line, "SERVER:PING:", 12) == 0)
