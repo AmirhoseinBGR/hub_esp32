@@ -13,7 +13,7 @@ void setup()
 {
     Serial.begin(115200);
 
-    store_load(); // restore WiFi + Server settings from NVS
+   // store_load(); // restore WiFi + Server settings from NVS
     uart_begin();
     net_begin();  // AP always on; STA connect if settings stored
     web_begin();
@@ -21,10 +21,19 @@ void setup()
     net_ping_task_start(); // background server ping, keeps loop() free
 
     Serial.println("EvoHatch Hub ready");
+
+    pinMode(2  , OUTPUT); // onboard LED
 }
 
 void loop()
 {
+    static long long now = millis();
+    
+    if (now - millis() > 1000) {
+        digitalWrite(2, !digitalRead(2)); // toggle onboard LED
+        now = millis();
+    }
+
     server.handleClient();
     uart_poll();
     net_service();
