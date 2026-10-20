@@ -13,7 +13,7 @@ void setup()
 {
     Serial.begin(115200);
 
-   // store_load(); // restore WiFi + Server settings from NVS
+    store_load(); // restore WiFi + Server settings from NVS
     uart_begin();
     net_begin();  // AP always on; STA connect if settings stored
     web_begin();
@@ -29,10 +29,13 @@ void loop()
 {
     static long long now = millis();
     
-    if (now - millis() > 1000) {
+    // heartbeat: reversed comparison meant the LED never blinked and a live
+    // board looked dead while WiFi was failing
+    if (millis() - now >= 100) {
         digitalWrite(2, !digitalRead(2)); // toggle onboard LED
         now = millis();
     }
+    
 
     server.handleClient();
     uart_poll();

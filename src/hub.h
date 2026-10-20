@@ -67,6 +67,8 @@ struct HubState
     // connection progress, drives the web page error messages:
     // phase: 0 idle, 1 connecting, 2 connected, 3 failed
     // err:   0 none, 1 wrong password, 2 timeout / no network, 3 other
+    // phase 3 is NOT final: net.cpp keeps auto-retrying with backoff until
+    // the AP answers, new credentials arrive, or wifi_auto is switched off.
     uint8_t wifi_phase = 0;
     uint8_t wifi_err = 0;
 
