@@ -1,5 +1,6 @@
 /** uart_link.cpp - protocol parser. Every message is one line: TYPE|f1|f2|... */
 #include "uart_link.h"
+#include "remote_settings.h"
 #include "config.h"
 #include "gsm_log.h"
 #include "hub.h"
@@ -183,7 +184,8 @@ static void process_line(const char *line)
 {
     if (line[0] == '\0') return;
 
-    if (strncmp(line, "GSM:LOG|", 8) == 0)
+    if (strncmp(line, "CFG:RES|", 8) == 0) { remote_settings_result(line); }
+    else if (strncmp(line, "GSM:LOG|", 8) == 0)
     {
         gsm_log_add(line + 8);
     }

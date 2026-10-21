@@ -16,6 +16,7 @@
  * and forwards SET: to the STM32 so both sides stay in sync.
  */
 #include "web_api.h"
+#include "remote_settings.h"
 #include "config.h"
 #include "gsm_log.h"
 #include "hub.h"
@@ -117,6 +118,9 @@ static void handle_device()
     JsonDocument req;
     if (deserializeJson(req, server.arg("plain"))) return reply_ok(false);
 
+    if(req["sp_t"].is<float>() || req["sp_h"].is<float>()) {
+        server.send(409,"application/json","{\"error\":\"use /api/settings for verified setpoints\"}");return;
+    }
     uint8_t id = req["id"] | 0;
     if (id < 1 || id > DEV_COUNT) return reply_ok(false);
 
@@ -164,6 +168,7 @@ static void handle_gsm_cmd()
 
 void web_begin()
 {
+    remote_settings_routes();
     server.on("/", HTTP_GET, [] { server.send_P(200, "text/html; charset=utf-8", (const char *)INDEX_HTML); });
     server.on("/api/state", HTTP_GET, handle_state);
     server.on("/api/scan", HTTP_GET, handle_scan);

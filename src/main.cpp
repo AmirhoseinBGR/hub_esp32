@@ -28,14 +28,14 @@ void setup()
 void loop()
 {
     static long long now = millis();
-    
+
     // heartbeat: reversed comparison meant the LED never blinked and a live
     // board looked dead while WiFi was failing
     if (millis() - now >= 100) {
         digitalWrite(2, !digitalRead(2)); // toggle onboard LED
         now = millis();
     }
-    
+
 
     server.handleClient();
     uart_poll();
