@@ -106,3 +106,10 @@ bool apply_device(uint8_t id, int16_t sp_temp_x10, int16_t sp_hum_x10, uint16_t 
 
 // Serialize the whole state for GET /api/state
 void hub_to_json(JsonDocument &doc);
+
+// hub_to_json() serialized into out[cap] with zero heap traffic (fixed
+// arena - see json_arena.h). With frame_type != nullptr the first field
+// is "type":"<frame_type>" (cloud frames). Returns the byte count written
+// excluding the null terminator that is also stored, or 0 when the output
+// does not fit. Loop-task only.
+size_t hub_state_json(char *out, size_t cap, const char *frame_type = nullptr);

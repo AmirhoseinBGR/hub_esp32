@@ -11,6 +11,7 @@
 #include "cloud_config.h"
 #include "gsm_log.h"
 #include "hub.h"
+#include "json_arena.h"
 #include "net.h"
 #include "remote_settings.h"
 #include "store.h"
@@ -27,6 +28,29 @@ static bool socketStarted = false;
 static uint32_t lastStatePublishMs = 0;
 static uint32_t lastLogSeq = 0;
 static char commandHeaders[256];
+
+// Reconnect pacing + last-resort self-reset. A wedged TLS/heap state
+// (WiFiClientSecure logging "start_ssl_client: -1" on every attempt) used
+// to keep the hub offline until a human power-cycled it: the library
+// retried a blocking handshake every 5 s forever. Attempts are paced
+// with backoff here, and if the cloud stays down while Wi-Fi is up the
+// board resets itself - with an escalating delay kept in RTC memory so
+// an unreachable server cannot cause a tight reboot loop.
+#define CLOUD_RETRY_MIN_MS 5000u
+#define CLOUD_RETRY_MAX_MS 60000u
+#define CLOUD_RESET_AFTER_MS 180000u
+
+static uint32_t offlineSinceMs = 0;   // start of the current offline stretch
+static uint32_t nextAttemptMs = 0;    // gate for socketClient.loop() while offline
+static uint32_t attemptBackoffMs = CLOUD_RETRY_MIN_MS;
+RTC_DATA_ATTR static uint32_t cloudResetCount = 0; // survives ESP.restart()
+
+static void log_heap(const char *tag)
+{
+    Serial.printf("[CLOUD] %s (heap free=%u, largest block=%u, min free=%u)\n", tag,
+                  (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(),
+                  (unsigned)ESP.getMinFreeHeap());
+}
 
 // Manual HTTP checks run in net.cpp's worker task. Copy their result back to
 // loop() so the WebSockets library is only touched by the Arduino main task.
@@ -65,9 +89,10 @@ static void send_result_data(const char *id, bool ok, const char *message,
     else if (data_kind == 2)
         doc["data"]["ok"] = data_value;
 
-    String text;
-    serializeJson(doc, text);
-    socketClient.sendTXT(text);
+    static char text[640];
+    if (measureJson(doc) + 1 > sizeof(text)) return;
+    const size_t n = serializeJson(doc, text, sizeof(text));
+    if (n) socketClient.sendTXT((uint8_t *)text, n);
 }
 
 void cloud_link_send_result(const char *id, bool ok, const char *message)
@@ -102,12 +127,21 @@ bool cloud_link_is_connected() { return hub.cloud_connected; }
 static void publish_state()
 {
     if (!configured || !hub.cloud_connected) return;
-    JsonDocument doc;
-    doc["type"] = "state";
-    hub_to_json(doc);
-    String text;
-    serializeJson(doc, text);
-    if (socketClient.sendTXT(text)) hub.cloud_last_tx_ms = millis();
+    // Fixed arena + fixed frame buffer: this runs every ~1.2 s forever
+    // and must never churn the heap (see hub_state_json in hub.cpp).
+    static char text[5120];
+    const size_t n = hub_state_json(text, sizeof(text), "state");
+    if (n == 0)
+    {
+        static uint32_t lastLogMs = 0;
+        if (millis() - lastLogMs >= 60000)
+        {
+            lastLogMs = millis();
+            log_heap("state frame did not fit its buffer");
+        }
+        return;
+    }
+    if (socketClient.sendTXT((uint8_t *)text, n)) hub.cloud_last_tx_ms = millis();
 }
 
 static void publish_gsm_logs()
@@ -117,16 +151,28 @@ static void publish_gsm_logs()
     if (latest < lastLogSeq) lastLogSeq = 0; // the hub rebooted; its local sequence restarted
     if (latest == lastLogSeq) return;
 
-    JsonDocument doc;
+    // Same zero-heap discipline as publish_state(): modem chatter can make
+    // this fire on most publish cycles, so it gets its own little arena.
+    static JsonArena<8192> arena;
+    static char text[8192];
+    arena.reset();
+    JsonDocument doc(&arena);
     doc["type"] = "gsm";
     doc["seq"] = latest;
     JsonArray lines = doc["logs"].to<JsonArray>();
     gsm_log_to_json(lines, lastLogSeq, 20);
     if (lines.size() == 0) return;
 
-    String text;
-    serializeJson(doc, text);
-    if (socketClient.sendTXT(text)) lastLogSeq = latest;
+    if (doc.overflowed() || measureJson(doc) + 1 > sizeof(text))
+    {
+        // A batch that can never be framed must not wedge the stream:
+        // drop it (console lines only) and continue with newer ones.
+        Serial.println("[CLOUD] GSM log batch too large, dropped");
+        lastLogSeq = latest;
+        return;
+    }
+    const size_t n = serializeJson(doc, text, sizeof(text));
+    if (n && socketClient.sendTXT((uint8_t *)text, n)) lastLogSeq = latest;
 }
 
 static bool valid_command_id(const char *id)
@@ -280,13 +326,14 @@ static void web_socket_event(WStype_t type, uint8_t *payload, size_t length)
     {
         case WStype_CONNECTED:
             hub.cloud_connected = true;
+            cloudResetCount = 0; // link proven healthy: re-arm the watchdog ladder
             lastStatePublishMs = 0;
             Serial.println("[CLOUD] WSS connected");
             publish_state();
             break;
         case WStype_DISCONNECTED:
             hub.cloud_connected = false;
-            Serial.println("[CLOUD] WSS disconnected");
+            log_heap("WSS disconnected");
             break;
         case WStype_TEXT:
             handle_command(payload, length);
@@ -296,7 +343,7 @@ static void web_socket_event(WStype_t type, uint8_t *payload, size_t length)
             break;
         case WStype_ERROR:
             hub.cloud_connected = false;
-            Serial.println("[CLOUD] WSS error");
+            log_heap("WSS error");
             break;
         default:
             break;
@@ -339,8 +386,62 @@ void cloud_link_poll()
         if (now < 1700000000) return; // wait for SNTP before verifying TLS dates
         socketClient.beginSslWithCA(CLOUD_WS_HOST, CLOUD_WS_PORT, CLOUD_WS_PATH, CLOUD_ROOT_CA);
         socketStarted = true;
+        nextAttemptMs = 0; // run the first connection attempt promptly below
     }
-    socketClient.loop();
+
+    if (hub.cloud_connected)
+    {
+        offlineSinceMs = 0;
+        attemptBackoffMs = CLOUD_RETRY_MIN_MS;
+        nextAttemptMs = 0;
+        socketClient.loop();
+    }
+    else
+    {
+        const uint32_t nowMs = millis();
+        if (offlineSinceMs == 0)
+        {
+            offlineSinceMs = nowMs ? nowMs : 1;
+            attemptBackoffMs = CLOUD_RETRY_MIN_MS;
+            nextAttemptMs = 0;
+        }
+        // Pace reconnect attempts with backoff. Each attempt blocks the
+        // Arduino loop inside the TLS handshake for seconds, so retrying
+        // at the library's fixed cadence starves the web server and the
+        // UART bridge for as long as the link is down.
+        if ((int32_t)(nowMs - nextAttemptMs) >= 0)
+        {
+            socketClient.loop(); // may block in the handshake; may connect
+            if (!hub.cloud_connected)
+            {
+                nextAttemptMs = millis() + attemptBackoffMs;
+                attemptBackoffMs = attemptBackoffMs * 2 > CLOUD_RETRY_MAX_MS
+                                       ? CLOUD_RETRY_MAX_MS
+                                       : attemptBackoffMs * 2;
+            }
+        }
+        if (WiFi.status() != WL_CONNECTED)
+        {
+            // The offline clock only ticks while Wi-Fi is up: an AP outage
+            // is net.cpp's problem and must not count against the cloud.
+            offlineSinceMs = millis() ? millis() : 1;
+        }
+        else if (!hub.cloud_connected)
+        {
+            // Last resort: Wi-Fi is healthy but the WSS link will not come
+            // up (wedged TLS/heap state). Reset instead of waiting for a
+            // manual power-cycle; the RTC counter stretches the interval
+            // (3, 6, 12, 24 min) while the server itself stays unreachable.
+            const uint32_t shift = cloudResetCount > 3 ? 3 : cloudResetCount;
+            if (millis() - offlineSinceMs >= (CLOUD_RESET_AFTER_MS << shift))
+            {
+                cloudResetCount++;
+                log_heap("cloud offline too long, self-reset");
+                Serial.flush();
+                ESP.restart();
+            }
+        }
+    }
 
     char resultId[sizeof(pingResultId)] = "";
     bool resultOk = false;

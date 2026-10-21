@@ -41,9 +41,13 @@ static void reply_ok(bool ok) { server.send(200, "application/json; charset=utf-
 
 static void handle_state()
 {
-    JsonDocument doc;
-    hub_to_json(doc);
-    reply_json(200, doc);
+    // Polled every ~1.8 s while the panel is open: use the zero-heap
+    // serializer so an always-open browser tab cannot fragment the heap
+    // the TLS handshake depends on (see hub_state_json in hub.cpp).
+    static char buf[5120];
+    const size_t n = hub_state_json(buf, sizeof(buf));
+    if (n) server.send_P(200, "application/json; charset=utf-8", buf, n);
+    else server.send(200, "application/json; charset=utf-8", "{}");
 }
 
 static void handle_scan()
