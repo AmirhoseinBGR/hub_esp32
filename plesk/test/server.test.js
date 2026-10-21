@@ -3,9 +3,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const os = require('node:os');
+const fs = require('node:fs');
 const { once } = require('node:events');
 const WebSocket = require('ws');
-const { createHubServer } = require('../server');
+const { createHubServer, readConfig } = require('../server');
 
 const config = {
   host: '127.0.0.1', port: 0, publicOrigin: '',
@@ -15,6 +17,38 @@ const config = {
   deviceTimeoutMs: 10000, commandTimeoutMs: 2500, nodeEnv: 'test',
   publicDir: path.join(__dirname, '..', 'public'),
 };
+
+test('configuration preserves IISNode named-pipe PORT values', () => {
+  const pipePath = String.raw`\\.\pipe\evohatch-test`;
+  const parsed = readConfig({
+    PORT: pipePath,
+    ADMIN_USERNAME: config.adminUsername,
+    ADMIN_PASSWORD: config.adminPassword,
+    SESSION_SECRET: config.sessionSecret,
+    DEVICE_ID: config.deviceId,
+    DEVICE_TOKEN: config.deviceToken,
+    NODE_ENV: 'production',
+  });
+  assert.equal(parsed.port, pipePath);
+  assert.equal(readConfig({
+    PORT: '3000', ADMIN_USERNAME: config.adminUsername,
+    ADMIN_PASSWORD: config.adminPassword, SESSION_SECRET: config.sessionSecret,
+    DEVICE_ID: config.deviceId, DEVICE_TOKEN: config.deviceToken,
+  }).port, 3000);
+});
+
+test('server listens on a path-style PORT used by IISNode', async (t) => {
+  const socketPath = process.platform === 'win32'
+    ? String.raw`\\.\pipe\evohatch-iisnode-${process.pid}-${Date.now()}`
+    : path.join(os.tmpdir(), `evohatch-iisnode-${process.pid}-${Date.now()}.sock`);
+  const hub = createHubServer({ config: { ...config, port: socketPath } });
+  await hub.listen();
+  assert.equal(hub.server.address(), socketPath);
+  t.after(async () => {
+    await hub.close();
+    if (process.platform !== 'win32') fs.rmSync(socketPath, { force: true });
+  });
+});
 
 async function createTestServer() {
   const hub = createHubServer({ config });

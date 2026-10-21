@@ -29,7 +29,12 @@ function safeEqual(left, right) {
 function readConfig(env = process.env) {
   const config = {
     host: env.HOST || '0.0.0.0',
-    port: Number(env.PORT || env.PLESK_NODE_PORT || 3000),
+    // IISNode sets PORT to a Windows named pipe, not a numeric TCP port.
+    // Keep that path intact for server.listen(path).
+    port: (() => {
+      const value = String(env.PORT || env.PLESK_NODE_PORT || '3000');
+      return /^\d+$/.test(value) ? Number(value) : value;
+    })(),
     publicOrigin: env.PUBLIC_ORIGIN ? new URL(env.PUBLIC_ORIGIN).origin : '',
     adminUsername: env.ADMIN_USERNAME || '',
     adminPassword: env.ADMIN_PASSWORD || '',
@@ -42,8 +47,13 @@ function readConfig(env = process.env) {
     publicDir: path.join(__dirname, 'public'),
   };
 
-  if (!Number.isInteger(config.port) || config.port < 0 || config.port > 65535) {
+  if (typeof config.port === 'number' &&
+      (!Number.isInteger(config.port) || config.port < 0 || config.port > 65535)) {
     throw new Error('PORT must be a valid TCP port.');
+  }
+  if (typeof config.port !== 'number' &&
+      (typeof config.port !== 'string' || !config.port || config.port.includes('\0'))) {
+    throw new Error('PORT must be a TCP port or an IISNode named-pipe path.');
   }
   if (!config.adminUsername || config.adminUsername.length > 64) {
     throw new Error('Set ADMIN_USERNAME in Plesk or plesk/.env.');
@@ -564,7 +574,9 @@ function createHubServer(options = {}) {
       const onListening = () => { server.off('error', onError); resolve(server.address()); };
       server.once('error', onError);
       server.once('listening', onListening);
-      server.listen(port, host);
+      // A non-numeric PORT is an IPC named pipe under IISNode on Windows.
+      if (typeof port === 'string' && !/^\d+$/.test(port)) server.listen(port);
+      else server.listen(Number(port), host);
     });
   }
 
@@ -580,7 +592,10 @@ if (require.main === module) {
     process.exit(1);
   }
   hub.listen().then((address) => {
-    console.log(`[evohatch-cloud] listening on ${address.address}:${address.port}`);
+    const endpoint = typeof address === 'string'
+      ? 'IISNode named pipe'
+      : `${address.address}:${address.port}`;
+    console.log(`[evohatch-cloud] listening on ${endpoint}`);
     console.log(`[evohatch-cloud] device id: ${hub.config.deviceId}; WebSocket: /ws/device`);
   }).catch((error) => {
     console.error(`[startup] ${error.message}`);
