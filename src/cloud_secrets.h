@@ -1,0 +1,5 @@
+
+#pragma once
+
+#define CLOUD_DEVICE_ID "hub-01"
+#define CLOUD_DEVICE_TOKEN "ae977fb636ee93c4857787a94d658045240c72b5d6f89bf5129d2df4f0d3ce4f"

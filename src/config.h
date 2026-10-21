@@ -23,7 +23,10 @@
  *   SERVER:PING_RES:OK | SERVER:PING_RES:FAIL
  *   SERVER:SYNC_RES:OK
  *   CREDIT:<toman>
- *   GSM:CMD|<command>                       web/serial -> modem CLI
+ *   GSM:CMD|<command>                       web/serial/cloud -> modem CLI
+ *
+ * Cloud WebSocket (WSS): authenticated JSON command frames are translated to
+ * the same SET:/REQ:/GSM:CMD UART protocol; live HubState + GSM logs stream up.
  */
 #pragma once
 

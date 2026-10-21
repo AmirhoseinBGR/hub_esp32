@@ -65,6 +65,11 @@ void hub_to_json(JsonDocument &doc)
     doc["link"]["stm32"] = hub.stm32_ok;
     doc["link"]["age_ms"] = hub.last_rx_ms ? (uint32_t)(millis() - hub.last_rx_ms) : 0;
 
+    JsonObject cloud = doc["cloud"].to<JsonObject>();
+    cloud["enabled"] = hub.cloud_configured;
+    cloud["connected"] = hub.cloud_connected;
+    cloud["last_seen_ms"] = hub.cloud_last_tx_ms ? (uint32_t)(millis() - hub.cloud_last_tx_ms) : 0;
+
     JsonObject w = doc["wifi"].to<JsonObject>();
     w["ssid"] = hub.wifi_ssid;
     w["pass_set"] = hub.wifi_pass[0] != '\0';
@@ -74,6 +79,9 @@ void hub_to_json(JsonDocument &doc)
     w["ap"] = AP_SSID;
     w["phase"] = hub.wifi_phase;
     w["err"] = hub.wifi_err;
+    w["scanning"] = hub.scanning;
+    JsonArray networks = w["networks"].to<JsonArray>();
+    for (int i = 0; i < hub.scan_count && i < SCAN_MAX; i++) networks.add(hub.scan_list[i]);
 
     JsonObject s = doc["server"].to<JsonObject>();
     s["domain"] = hub.server_domain;
