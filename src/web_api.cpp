@@ -176,6 +176,9 @@ void web_begin()
 {
     remote_settings_routes();
     server.on("/", HTTP_GET, [] { server.send_P(200, "text/html; charset=utf-8", (const char *)INDEX_HTML); });
+    // Browsers ask for this on every visit; answer cheaply instead of
+    // running the not-found path (and its core error log) each time.
+    server.on("/favicon.ico", HTTP_GET, [] { server.send(204, "text/plain", ""); });
     server.on("/api/state", HTTP_GET, handle_state);
     server.on("/api/scan", HTTP_GET, handle_scan);
     server.on("/api/ping", HTTP_GET, [] { reply_ok(net_ping_server()); });

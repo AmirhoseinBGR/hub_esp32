@@ -41,7 +41,7 @@ function readConfig(env = process.env) {
     sessionSecret: env.SESSION_SECRET || '',
     deviceId: env.DEVICE_ID || 'hub-01',
     deviceToken: env.DEVICE_TOKEN || '',
-    deviceTimeoutMs: Math.max(5000, Number(env.DEVICE_TIMEOUT_MS || 15000)),
+    deviceTimeoutMs: Math.max(5000, Number(env.DEVICE_TIMEOUT_MS || 45000)),
     commandTimeoutMs: Math.max(3000, Number(env.COMMAND_TIMEOUT_MS || 10000)),
     nodeEnv: env.NODE_ENV || 'development',
     publicDir: path.join(__dirname, 'public'),
@@ -403,7 +403,8 @@ function createHubServer(options = {}) {
         lastSeen = Date.now();
         console.log('[device] hub connected');
         ws.isAlive = true;
-        ws.on('pong', () => { ws.isAlive = true; lastSeen = Date.now(); });
+        ws.missedPongs = 0;
+        ws.on('pong', () => { ws.isAlive = true; ws.missedPongs = 0; lastSeen = Date.now(); });
         ws.on('message', (data, binary) => handleDeviceMessage(ws, data, binary));
         ws.on('error', () => {});
         ws.on('close', (code) => {
@@ -574,10 +575,21 @@ function createHubServer(options = {}) {
 
   const heartbeat = setInterval(() => {
     if (deviceSocket && deviceSocket.readyState === WebSocket.OPEN) {
+      // The hub is a single-loop embedded board: serving its local panel
+      // or running a Wi-Fi scan can delay pongs for many seconds. Treat
+      // the link as dead only after several consecutive missed pongs
+      // (~45-60 s of total silence), never after a single slow reply -
+      // killing a merely busy hub was the main source of flapping.
       if (deviceSocket.isAlive === false) {
-        deviceSocket.terminate();
+        deviceSocket.missedPongs = (deviceSocket.missedPongs || 0) + 1;
+        if (deviceSocket.missedPongs >= 3) {
+          deviceSocket.terminate();
+        } else {
+          try { deviceSocket.ping(); } catch { deviceSocket.terminate(); }
+        }
       } else {
         deviceSocket.isAlive = false;
+        deviceSocket.missedPongs = 0;
         try { deviceSocket.ping(); } catch { deviceSocket.terminate(); }
       }
     }

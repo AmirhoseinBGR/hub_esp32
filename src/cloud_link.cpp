@@ -366,7 +366,12 @@ void cloud_link_begin()
     socketClient.setExtraHeaders(commandHeaders);
     socketClient.onEvent(web_socket_event);
     socketClient.setReconnectInterval(5000);
-    socketClient.enableHeartbeat(20000, 5000, 2);
+    // Generous heartbeat: this board is a single Arduino loop - serving
+    // the local panel or running a Wi-Fi scan can stall loop() (and with
+    // it ping/pong handling) for many seconds. Tight values made a merely
+    // busy hub declare its own healthy link dead. Real link death is
+    // still noticed by the server's pings long before this trips.
+    socketClient.enableHeartbeat(30000, 15000, 3);
 
     // CA validation checks certificate validity dates. SNTP runs in the
     // background; defer the first TLS handshake until the clock is credible.
