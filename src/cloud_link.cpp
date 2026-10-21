@@ -31,18 +31,17 @@ static char commandHeaders[256];
 
 // Reconnect pacing + last-resort self-reset. A wedged TLS/heap state
 // (WiFiClientSecure logging "start_ssl_client: -1" on every attempt) used
-// to keep the hub offline until a human power-cycled it: the library
-// retried a blocking handshake every 5 s forever. Attempts are paced
-// with backoff here, and if the cloud stays down while Wi-Fi is up the
-// board resets itself - with an escalating delay kept in RTC memory so
-// an unreachable server cannot cause a tight reboot loop.
+// to keep the hub offline until a human power-cycled it. Attempts are
+// paced by stretching the library's own reconnect interval while an
+// outage lasts (never by withholding loop() calls - see cloud_link_poll),
+// and if the cloud stays down while Wi-Fi is up the board resets itself,
+// with an escalating delay kept in RTC memory so an unreachable server
+// cannot cause a tight reboot loop.
 #define CLOUD_RETRY_MIN_MS 5000u
 #define CLOUD_RETRY_MAX_MS 60000u
 #define CLOUD_RESET_AFTER_MS 180000u
 
-static uint32_t offlineSinceMs = 0;   // start of the current offline stretch
-static uint32_t nextAttemptMs = 0;    // gate for socketClient.loop() while offline
-static uint32_t attemptBackoffMs = CLOUD_RETRY_MIN_MS;
+static uint32_t offlineSinceMs = 0; // start of the current offline stretch
 RTC_DATA_ATTR static uint32_t cloudResetCount = 0; // survives ESP.restart()
 
 static void log_heap(const char *tag)
@@ -386,54 +385,50 @@ void cloud_link_poll()
         if (now < 1700000000) return; // wait for SNTP before verifying TLS dates
         socketClient.beginSslWithCA(CLOUD_WS_HOST, CLOUD_WS_PORT, CLOUD_WS_PATH, CLOUD_ROOT_CA);
         socketStarted = true;
-        nextAttemptMs = 0; // run the first connection attempt promptly below
     }
+    // NEVER gate this call while a connection attempt may be in flight:
+    // the library reads one handshake header line per loop() and drops
+    // the attempt if the handshake has not finished within
+    // WEBSOCKETS_TCP_TIMEOUT (5 s) of sending it. Sleeping between
+    // loop() calls therefore makes connecting impossible (this exact
+    // regression shipped once - the hub logged "WSS disconnected"
+    // forever without ever connecting). Pacing between attempts is the
+    // library's own reconnect interval, adjusted below.
+    socketClient.loop();
 
     if (hub.cloud_connected)
     {
         offlineSinceMs = 0;
-        attemptBackoffMs = CLOUD_RETRY_MIN_MS;
-        nextAttemptMs = 0;
-        socketClient.loop();
+        socketClient.setReconnectInterval(CLOUD_RETRY_MIN_MS); // fresh drop: retry fast
     }
     else
     {
         const uint32_t nowMs = millis();
-        if (offlineSinceMs == 0)
-        {
-            offlineSinceMs = nowMs ? nowMs : 1;
-            attemptBackoffMs = CLOUD_RETRY_MIN_MS;
-            nextAttemptMs = 0;
-        }
-        // Pace reconnect attempts with backoff. Each attempt blocks the
-        // Arduino loop inside the TLS handshake for seconds, so retrying
-        // at the library's fixed cadence starves the web server and the
-        // UART bridge for as long as the link is down.
-        if ((int32_t)(nowMs - nextAttemptMs) >= 0)
-        {
-            socketClient.loop(); // may block in the handshake; may connect
-            if (!hub.cloud_connected)
-            {
-                nextAttemptMs = millis() + attemptBackoffMs;
-                attemptBackoffMs = attemptBackoffMs * 2 > CLOUD_RETRY_MAX_MS
-                                       ? CLOUD_RETRY_MAX_MS
-                                       : attemptBackoffMs * 2;
-            }
-        }
+        if (offlineSinceMs == 0) offlineSinceMs = nowMs ? nowMs : 1;
+
         if (WiFi.status() != WL_CONNECTED)
         {
             // The offline clock only ticks while Wi-Fi is up: an AP outage
             // is net.cpp's problem and must not count against the cloud.
-            offlineSinceMs = millis() ? millis() : 1;
+            offlineSinceMs = nowMs ? nowMs : 1;
         }
-        else if (!hub.cloud_connected)
+        else
         {
+            const uint32_t offMs = nowMs - offlineSinceMs;
+            // Stretch the library's retry pacing the longer the outage
+            // lasts: each attempt blocks loop() inside the TLS handshake
+            // for seconds, so a dead server must not be hammered at the
+            // fastest cadence forever.
+            socketClient.setReconnectInterval(offMs < 20000u    ? CLOUD_RETRY_MIN_MS
+                                              : offMs < 60000u  ? 15000u
+                                              : offMs < 180000u ? 30000u
+                                                                : CLOUD_RETRY_MAX_MS);
             // Last resort: Wi-Fi is healthy but the WSS link will not come
             // up (wedged TLS/heap state). Reset instead of waiting for a
             // manual power-cycle; the RTC counter stretches the interval
             // (3, 6, 12, 24 min) while the server itself stays unreachable.
             const uint32_t shift = cloudResetCount > 3 ? 3 : cloudResetCount;
-            if (millis() - offlineSinceMs >= (CLOUD_RESET_AFTER_MS << shift))
+            if (offMs >= (CLOUD_RESET_AFTER_MS << shift))
             {
                 cloudResetCount++;
                 log_heap("cloud offline too long, self-reset");
