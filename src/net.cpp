@@ -13,6 +13,7 @@
  * Ping:    own FreeRTOS task, loop() is never blocked by HTTP.
  */
 #include "net.h"
+#include "cloud_link.h"
 #include "config.h"
 #include "hub.h"
 #include "store.h"
@@ -39,12 +40,17 @@ static uint32_t retry_at = 0;  // earliest millis() for the next automatic attem
 static uint8_t retry_step = 0; // backoff exponent: WIFI_RETRY_BASE_MS << retry_step
 static uint32_t last_status_ms = 0;
 static volatile bool ping_busy = false;
+static TaskHandle_t ping_task_handle = nullptr;
+static portMUX_TYPE ping_mux = portMUX_INITIALIZER_UNLOCKED;
+static bool manual_ping_pending = false;
+static char manual_ping_id[64] = "";
 
 // Scan retry state — first scan often fails/returns empty while STA associates.
 static uint8_t scan_attempts = 0;
 static bool scan_retry_pending = false;
 static uint32_t scan_retry_at = 0;
 static uint32_t scan_start_ms = 0; // watchdog reference of the running async scan
+static bool scan_driver_running = false;
 
 static void scan_start_one(void);
 static void start_attempt(void);
@@ -217,6 +223,7 @@ void net_start_connect()
         esp_wifi_scan_stop();
         WiFi.scanDelete();
         hub.scanning = false;
+        scan_driver_running = false;
         scan_retry_pending = false;
         scan_attempts = 0;
     }
@@ -241,11 +248,15 @@ static void scan_schedule_retry()
     const uint8_t max_attempts = connecting ? WIFI_SCAN_RETRIES_BUSY : WIFI_SCAN_RETRIES;
     if (scan_attempts >= max_attempts)
     {
+        hub.scanning = false;
         hub.scan_count = 0;
         uart_send("WIFI:SCAN_RES:");
         return;
     }
 
+    // Public status means the whole scan operation is still in progress,
+    // including the short retry delay between asynchronous radio scans.
+    hub.scanning = true;
     scan_retry_pending = true;
     scan_retry_at      = millis() + WIFI_SCAN_RETRY_DELAY_MS;
 }
@@ -261,10 +272,12 @@ static void scan_start_one()
     if (r == WIFI_SCAN_RUNNING)
     {
         hub.scanning = true;
+        scan_driver_running = true;
         scan_start_ms = millis(); // watchdog reference
         return;
     }
 
+    scan_driver_running = false;
     hub.scanning = false;
 
     if (r > 0)
@@ -291,10 +304,11 @@ static void scan_service()
     /* Watchdog: an async scan that never reports done would keep hub.scanning
      * set forever and net_scan_start() would refuse to run again. Force-stop
      * the driver and let the normal retry logic take over. */
-    if (hub.scanning && millis() - scan_start_ms > WIFI_SCAN_TIMEOUT_MS)
+    if (scan_driver_running && millis() - scan_start_ms > WIFI_SCAN_TIMEOUT_MS)
     {
         esp_wifi_scan_stop();
         WiFi.scanDelete();
+        scan_driver_running = false;
         hub.scanning = false;
         scan_schedule_retry();
         return;
@@ -306,12 +320,13 @@ static void scan_service()
         return;
     }
 
-    if (!hub.scanning) return;
+    if (!scan_driver_running) return;
 
     // int16: dense areas report more than 127 APs, int8_t turned that into -1
     const int16_t r = WiFi.scanComplete();
     if (r == WIFI_SCAN_RUNNING) return;
 
+    scan_driver_running = false;
     hub.scanning = false;
 
     if (r <= 0)
@@ -446,18 +461,53 @@ bool net_ping_server()
     return ok;
 }
 
-// Periodic reachability check runs in its own task: HTTP timeout
-// can never freeze the web server or the UART link anymore.
+// Periodic reachability checks and on-demand cloud checks share one worker.
+// HTTP timeouts can never freeze the web server, UART, or WSS event loop.
 static void ping_task(void *)
 {
     for (;;)
     {
-        vTaskDelay(pdMS_TO_TICKS(PING_PERIOD_MS));
-        net_ping_server();
+        const uint32_t notified = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(PING_PERIOD_MS));
+        char request_id[sizeof(manual_ping_id)] = "";
+
+        if (notified)
+        {
+            portENTER_CRITICAL(&ping_mux);
+            strlcpy(request_id, manual_ping_id, sizeof(request_id));
+            manual_ping_id[0] = '\0';
+            manual_ping_pending = false;
+            portEXIT_CRITICAL(&ping_mux);
+        }
+
+        const bool ok = net_ping_server();
+        if (request_id[0]) cloud_link_report_ping(request_id, ok);
     }
+}
+
+void net_request_ping(const char *request_id)
+{
+    if (!request_id || !request_id[0]) return;
+    if (!ping_task_handle)
+    {
+        cloud_link_send_ping_result(request_id, false);
+        return;
+    }
+
+    bool queued = false;
+    portENTER_CRITICAL(&ping_mux);
+    if (!manual_ping_pending)
+    {
+        strlcpy(manual_ping_id, request_id, sizeof(manual_ping_id));
+        manual_ping_pending = true;
+        queued = true;
+    }
+    portEXIT_CRITICAL(&ping_mux);
+
+    if (queued) xTaskNotifyGive(ping_task_handle);
+    else cloud_link_send_result(request_id, false, "بررسی دیگری در حال اجراست.");
 }
 
 void net_ping_task_start()
 {
-    xTaskCreatePinnedToCore(ping_task, "ping", 4096, nullptr, 1, nullptr, 1);
+    xTaskCreatePinnedToCore(ping_task, "ping", 4096, nullptr, 1, &ping_task_handle, 1);
 }

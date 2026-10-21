@@ -1,0 +1,21 @@
+{
+  "name": "evohatch-cloud-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plesk-ready Node.js and WebSocket bridge for the EvoHatch ESP32 hub",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test",
+    "sync-ui": "node scripts/sync-ui.js"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}

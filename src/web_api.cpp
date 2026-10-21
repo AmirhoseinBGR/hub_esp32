@@ -26,6 +26,7 @@
 #include "uart_link.h"
 #include <ArduinoJson.h>
 #include <WiFi.h>
+#include <math.h>
 
 WebServer server(80);
 
@@ -118,15 +119,16 @@ static void handle_device()
     JsonDocument req;
     if (deserializeJson(req, server.arg("plain"))) return reply_ok(false);
 
-    if(req["sp_t"].is<float>() || req["sp_h"].is<float>()) {
-        server.send(409,"application/json","{\"error\":\"use /api/settings for verified setpoints\"}");return;
-    }
+    // The dashboard sends decimal setpoints directly; enforce the physical
+    // range before converting to the UART x10 format.
     uint8_t id = req["id"] | 0;
     if (id < 1 || id > DEV_COUNT) return reply_ok(false);
 
     const Device &d = hub.dev[id - 1];
     float sp_t = req["sp_t"] | d.sp_temp_x10 / 10.0f;
     float sp_h = req["sp_h"] | d.sp_hum_x10 / 10.0f;
+    if (!isfinite(sp_t) || !isfinite(sp_h) || sp_t < 20.0f || sp_t > 45.0f ||
+        sp_h < 0.0f || sp_h > 95.0f) return reply_ok(false);
     uint16_t mask = req["mask"] | d.alarm_enable;
     bool paired = req["paired"] | d.paired;
 

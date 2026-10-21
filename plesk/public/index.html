@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f3f6fb">
+<title>مرکز کنترل EvoHatch</title>
+<style>
+:root{
+  color-scheme:light;
+  --page:#f3f6fb;--surface:#fff;--surface-soft:#f7f9fd;--surface-blue:#eef4ff;
+  --line:#e4eaf3;--line-strong:#d5deeb;--text:#15233b;--muted:#71809a;
+  --blue:#315fca;--blue-dark:#234ba8;--cyan:#0e8a9b;--green:#16845b;
+  --red:#c7434c;--amber:#b87511;--purple:#7752b5;
+  --shadow:0 8px 26px rgba(28,48,82,.055);--shadow-hover:0 14px 32px rgba(28,48,82,.1);
+  --radius:18px;--radius-sm:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:Tahoma,'Segoe UI',system-ui,sans-serif}
+body{background:radial-gradient(ellipse at 90% 0%,#e7efff 0,transparent 35%),var(--page);color:var(--text);min-height:100vh;padding:22px 18px 36px}
+button,input,select{font:inherit}
+button{color:inherit}
+.app-shell{max-width:1440px;margin:0 auto}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 0 14px;padding:8px 4px}
+.brand{display:flex;align-items:center;gap:14px;min-width:220px}
+.brand-mark{width:54px;height:54px;display:grid;place-items:center;border-radius:17px;color:#fff;background:linear-gradient(145deg,#4778e8,#2d58bd 75%);box-shadow:0 9px 20px rgba(49,95,202,.2)}
+.brand-mark svg{width:30px;height:30px}
+.brand-copy .eyebrow{display:block;color:var(--blue);font-size:10px;font-weight:800;letter-spacing:.15px;margin-bottom:4px}
+.brand h1{font-size:21px;line-height:1.35;font-weight:800;letter-spacing:-.4px}
+.brand p{color:var(--muted);font-size:11px;margin-top:3px}
+.top-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.cloud-pill{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:10px 14px;color:#41536e;font-size:11px;font-weight:700;box-shadow:var(--shadow)}
+.cloud-pill .pulse{width:9px;height:9px;border-radius:50%;background:#aab6c7;box-shadow:0 0 0 4px #f0f3f7}
+.cloud-pill.online .pulse{background:var(--green);box-shadow:0 0 0 4px #e5f5ed}
+.cloud-pill.offline .pulse{background:var(--red);box-shadow:0 0 0 4px #fae9ea}
+.cloud-pill.wait .pulse{background:var(--amber);box-shadow:0 0 0 4px #fcf2e3;animation:pulse 1.7s infinite}
+.cloud-pill.local .pulse{background:#94a3b8;box-shadow:0 0 0 4px #edf1f6}
+@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(184,117,17,.08)}}
+.btn{border:0;border-radius:10px;background:var(--blue);color:#fff;padding:10px 15px;font-size:12px;font-weight:800;cursor:pointer;transition:transform .16s,background .16s,box-shadow .16s;box-shadow:0 5px 12px rgba(49,95,202,.14)}
+.btn:hover{background:var(--blue-dark);transform:translateY(-1px);box-shadow:0 8px 16px rgba(49,95,202,.18)}
+.btn:disabled{opacity:.55;cursor:wait;transform:none;box-shadow:none}
+.btn.secondary{background:#f3f6fb;color:#405573;border:1px solid var(--line);box-shadow:none}
+.btn.secondary:hover{background:#eaf0f8;border-color:var(--line-strong)}
+.btn.success{background:#16845b;box-shadow:0 5px 12px rgba(22,132,91,.14)}
+.btn.success:hover{background:#116c4a}
+.btn.danger{background:#c7434c;box-shadow:0 5px 12px rgba(199,67,76,.12)}
+.btn.danger:hover{background:#a9343d}
+.btn.sm{padding:7px 10px;font-size:10.5px;border-radius:9px}
+.btn.icon-btn{padding:9px;display:inline-grid;place-items:center;width:38px;height:38px}
+.btn.icon-btn svg{width:16px;height:16px}
+.status-rail{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px;padding:11px 13px;background:rgba(255,255,255,.76);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow)}
+.rail-label{font-size:10px;font-weight:800;color:var(--muted);padding:0 5px 0 7px}
+.chip{display:inline-flex;align-items:center;gap:7px;background:#f9fbfe;border:1px solid #e8edf5;border-radius:999px;padding:7px 11px;color:#60708a;font-size:10.5px;white-space:nowrap}
+.chip b{color:#334760;font-size:10.5px;font-weight:800;max-width:170px;overflow:hidden;text-overflow:ellipsis}
+.dot{width:8px;height:8px;border-radius:50%;background:#b3bdcb;flex:0 0 auto}
+.dot.on{background:#20a36f;box-shadow:0 0 0 3px #e6f6ee}.dot.off{background:#d44f58;box-shadow:0 0 0 3px #faecec}.dot.warn{background:#d39127;box-shadow:0 0 0 3px #fff4df}
+.banner{display:none;align-items:center;gap:10px;background:#fff8e9;border:1px solid #f1dcae;color:#8a5b12;border-radius:12px;padding:11px 14px;font-size:11px;font-weight:700;margin-bottom:13px}
+.banner.show{display:flex}
+.banner .banner-icon{width:24px;height:24px;display:grid;place-items:center;border-radius:8px;background:#fff0cb;font-weight:900}
+nav{display:flex;align-items:center;gap:7px;overflow-x:auto;scrollbar-width:thin;margin:0 0 16px;padding:4px 2px 7px}
+nav button{display:flex;align-items:center;gap:8px;white-space:nowrap;border:1px solid transparent;border-radius:11px;background:transparent;color:#71809a;padding:10px 15px;font-size:11.5px;font-weight:800;cursor:pointer;transition:.16s}
+nav button:hover{background:#fff;color:#324867;border-color:var(--line)}
+nav button.active{background:#e8efff;color:var(--blue);border-color:#d6e2ff;box-shadow:inset 0 0 0 1px rgba(49,95,202,.025)}
+.nav-icon{width:17px;height:17px;display:inline-grid;place-items:center;font-size:15px;line-height:1}
+section{display:none}
+section.active{display:block;animation:rise .2s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:158px;padding:24px 28px;margin-bottom:14px;color:#fff;background:linear-gradient(118deg,#234ca7 0%,#315fca 48%,#3983c7 100%);border-radius:20px;box-shadow:0 15px 32px rgba(44,89,177,.18)}
+.hero:before,.hero:after{content:"";position:absolute;border:1px solid rgba(255,255,255,.14);border-radius:50%;pointer-events:none}
+.hero:before{width:300px;height:300px;right:42%;top:-185px}.hero:after{width:230px;height:230px;right:55%;bottom:-185px}
+.hero-copy,.hero-side{position:relative;z-index:1}
+.hero-label{display:inline-flex;align-items:center;gap:8px;font-size:10px;color:#dce9ff;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:6px 10px;margin-bottom:12px}
+.hero-label .tiny-dot{width:6px;height:6px;border-radius:50%;background:#88f0c1;box-shadow:0 0 0 3px rgba(136,240,193,.16)}
+.hero h2{font-size:21px;line-height:1.5;font-weight:800;margin-bottom:5px}
+.hero p{font-size:11.5px;color:#dce9ff;line-height:1.9;max-width:660px}
+.hero-side{min-width:150px;text-align:left;direction:ltr}
+.hero-time{font-size:24px;letter-spacing:.4px;font-weight:800}
+.hero-date{margin-top:5px;color:#dce9ff;font-size:10px;direction:rtl;text-align:left}
+.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.stat-card{position:relative;display:flex;align-items:center;gap:13px;min-height:94px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);overflow:hidden}
+.stat-icon{width:43px;height:43px;flex:0 0 auto;border-radius:13px;display:grid;place-items:center;font-size:20px;background:#edf3ff;color:var(--blue)}
+.stat-icon.teal{background:#e8f7f5;color:var(--cyan)}.stat-icon.red{background:#fff0f0;color:var(--red)}.stat-icon.green{background:#eaf7ef;color:var(--green)}
+.stat-copy small{display:block;color:var(--muted);font-size:10px;font-weight:700;margin-bottom:5px}
+.stat-copy b{display:block;color:#223751;font-size:20px;line-height:1.1;font-weight:800}
+.stat-copy span{display:block;color:#91a0b5;font-size:9px;margin-top:5px}
+.panel-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.card-title{display:flex;align-items:center;gap:10px;min-width:0}
+.card-title .head-icon{width:34px;height:34px;border-radius:11px;background:#edf3ff;color:var(--blue);display:grid;place-items:center;font-size:16px;flex:0 0 auto}
+.card-title h3{font-size:12.5px;font-weight:800;color:#2c405b}
+.card-title p{font-size:9.5px;color:#91a0b5;margin-top:3px}
+.card-title .head-icon.teal{background:#e9f7f5;color:var(--cyan)}.card-title .head-icon.green{background:#eaf7ef;color:var(--green)}.card-title .head-icon.amber{background:#fff5e5;color:var(--amber)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #eff2f7;font-size:10.5px}
+.row:last-child{border-bottom:0}.row span{color:var(--muted);flex:0 0 auto}.row b{color:#324761;font-size:10.5px;font-weight:800;text-align:left;word-break:break-word}
+.row .value-status{display:inline-flex;align-items:center;gap:6px}
+.muted{color:var(--muted)!important}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:999px;font-size:9.5px;font-weight:800;white-space:nowrap}
+.badge.ok{background:#e8f6ed;color:#14784f}.badge.err{background:#fff0f0;color:#b33c45}.badge.dim{background:#f0f3f7;color:#73819a}.badge.warn{background:#fff4df;color:#94610e}.badge.info{background:#edf3ff;color:#315fca}
+.hint{color:#8290a6;font-size:10px;line-height:1.9;margin-top:11px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:13px;margin-bottom:14px}
+.field-label{display:block;color:#697b95;font-size:10px;font-weight:700;margin:12px 0 6px}
+input,select{width:100%;border:1px solid #dfe6f0;border-radius:10px;background:#fbfcfe;color:#243852;padding:11px 12px;font-size:12px;outline:none;transition:border .15s,box-shadow .15s}
+input::placeholder{color:#a9b4c4}input:focus,select:focus{border-color:#88a8ed;box-shadow:0 0 0 3px rgba(49,95,202,.09);background:white}
+input[type=checkbox]{accent-color:var(--blue)}
+.wfbanner{display:flex;align-items:center;gap:9px;border-radius:11px;padding:11px 12px;font-size:10.5px;font-weight:800;margin-bottom:9px}
+.wfbanner.ok{background:#eaf7ef;color:#16764e}.wfbanner.off{background:#f3f6fa;color:#75849a}.wfbanner.busy{background:#edf3ff;color:#315fca}.wfbanner.bad{background:#fff0f0;color:#b33c45}
+.wfbanner .dot{box-shadow:none}
+#wf-msg{margin-top:8px;min-height:16px;font-size:10.5px;font-weight:800;color:var(--green)}#wf-msg.err{color:var(--red)}#wf-msg.busy{color:var(--blue)}
+.dev-section{margin-top:13px}
+.devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(244px,1fr));gap:11px}
+.dev{display:flex;flex-direction:column;gap:11px;min-height:183px;padding:14px;background:linear-gradient(180deg,#fff,#fcfdff);border:1px solid var(--line);border-radius:15px;transition:transform .16s,box-shadow .16s,border-color .16s}
+.dev:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover)}.dev.off{background:#fafbfd}.dev.bad{border-color:#f0c8ca;box-shadow:0 4px 16px rgba(199,67,76,.06)}
+.dev-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dev-name-wrap{display:flex;align-items:center;gap:8px}.dev-number{width:29px;height:29px;border-radius:9px;background:#edf3ff;color:var(--blue);font-size:11px;font-weight:900;display:grid;place-items:center}
+.dev-name{font-size:11px;font-weight:800;color:#2f435d}.dev.off .dev-name{color:#8190a5}
+.dev-values{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.metric{border:1px solid #edf0f5;border-radius:11px;background:#f9fbfe;padding:9px 10px}
+.metric small{display:block;color:#8795aa;font-size:9px;margin-bottom:5px}.metric b{font-size:17px;color:#2d425d;font-weight:800}.metric i{font-style:normal;display:block;color:#a0adbe;font-size:8.5px;margin-top:3px}
+.alarms{display:flex;flex-wrap:wrap;gap:5px;min-height:18px}.al{border-radius:6px;background:#fff0f0;color:#b54048;padding:4px 7px;font-size:8.5px;font-weight:700}
+.dev-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto}.rot{font-size:9px;color:#8795aa}
+.checks{display:flex;flex-direction:column;gap:7px}.chk{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid #e9edf4;border-radius:10px;background:#fbfcfe;color:#4c5f7a;font-size:10.5px;font-weight:700;cursor:pointer}.chk input{width:auto;margin:0}.chk.dis{opacity:.6;cursor:not-allowed}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}.gsmgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px}
+.gcell{min-height:65px;padding:11px 12px;border:1px solid #e9edf4;border-radius:11px;background:#fbfcfe}.gcell small{display:block;color:#8290a6;font-size:9px;margin-bottom:7px}.gcell b{font-size:11.5px;color:#2b405b;word-break:break-word}.gcell b.ok{color:var(--green)}.gcell b.err{color:var(--red)}.gcell b.warn{color:var(--amber)}.gcell b.acc{color:var(--blue)}
+.qbtns{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:7px;margin-top:10px}
+#term{height:300px;overflow:auto;padding:13px 14px;border-radius:12px;background:#162235;border:1px solid #263951;color:#d6e1ee;direction:ltr;text-align:left;white-space:pre-wrap;word-break:break-all;font-family:'Cascadia Code','Consolas','Courier New',monospace;font-size:10.5px;line-height:1.7}
+.tl{color:#c0ccdb;font-family:inherit}.tl.err{color:#ff8f94}.tl.warn{color:#ffd47c}.tl.ok{color:#8fe0b0}.tl.info{color:#8bc9ff}.tl.sys{color:#d0b0ff}
+.termrow{display:flex;gap:7px;margin-top:8px;direction:ltr}.termrow input{flex:1;direction:ltr;text-align:left;background:#fbfcfe;font-family:'Cascadia Code','Consolas','Courier New',monospace}
+.term-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.term-live{display:flex;align-items:center;gap:6px;color:#8190a6;font-size:9.5px}.term-live .dot{width:7px;height:7px}
+.modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(21,35,59,.42);backdrop-filter:blur(4px)}.modal.open{display:flex}
+.mbox{width:100%;max-width:460px;max-height:90vh;overflow:auto;padding:22px;background:white;border:1px solid rgba(255,255,255,.7);border-radius:19px;box-shadow:0 25px 75px rgba(24,39,66,.2)}
+.mbox h3{font-size:15px;font-weight:800;color:#233851}.mbox .sub{font-size:10px;color:#8290a6;margin:5px 0 12px}.mrow{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+#toasts{position:fixed;z-index:99;left:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;max-width:min(360px,calc(100vw - 32px))}
+.toast{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 15px;font-size:11px;font-weight:700;color:#344a66;box-shadow:0 10px 28px rgba(20,35,60,.15);animation:rise .18s}.toast.ok{border-color:#cde9d7;color:#16764e}.toast.err{border-color:#f1c9cb;color:#b33c45}
+.footer-note{display:flex;justify-content:space-between;gap:10px;color:#9aa6b7;font-size:9px;padding:13px 4px 0}
+.auth-screen{display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;padding:18px;background:radial-gradient(ellipse at 85% 15%,#dfeaff 0,transparent 38%),#f2f5fa}
+.auth-screen.show{display:flex}.auth-card{width:100%;max-width:420px;padding:30px;background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 20px 60px rgba(30,55,94,.12)}
+.auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:25px}.auth-brand .brand-mark{width:46px;height:46px;border-radius:14px}.auth-brand h2{font-size:17px;color:#213752}.auth-brand p{font-size:10px;color:#8391a6;margin-top:3px}.auth-card h3{font-size:19px;color:#233851;margin-bottom:7px}.auth-card .auth-copy{font-size:10.5px;line-height:1.9;color:#77869c;margin-bottom:14px}.auth-card .field-label{margin-top:13px}.auth-card .btn{width:100%;margin-top:18px;padding:12px}.auth-error{display:none;color:var(--red);background:#fff0f0;border-radius:9px;padding:9px 11px;margin-top:12px;font-size:10px;font-weight:700}.auth-error.show{display:block}.auth-foot{border-top:1px solid #eff2f7;margin-top:20px;padding-top:13px;color:#9aa6b7;font-size:9px;line-height:1.8}
+@media(max-width:1050px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.panel-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.panel-grid .card:last-child{grid-column:span 2}}
+@media(max-width:700px){body{padding:14px 11px 26px}.topbar{align-items:flex-start;flex-direction:column;padding:4px 2px}.top-actions{width:100%;justify-content:space-between}.brand h1{font-size:18px}.brand-mark{width:47px;height:47px}.hero{padding:20px;min-height:unset}.hero h2{font-size:17px}.hero p{font-size:10.5px}.hero-side{min-width:100px}.hero-time{font-size:20px}.panel-grid{grid-template-columns:1fr}.panel-grid .card:last-child{grid-column:auto}.status-rail{gap:6px;padding:9px}.rail-label{width:100%;padding-bottom:2px}.chip{padding:6px 9px;font-size:9.5px}.chip b{font-size:9.5px}.card{padding:15px}.devgrid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}}
+@media(max-width:460px){body{padding:10px 9px 24px}.brand{gap:10px}.brand h1{font-size:16px}.brand p{font-size:9.5px}.cloud-pill{padding:8px 10px;font-size:9.5px}.hero{display:block}.hero-side{margin-top:16px;text-align:right;direction:rtl}.hero-date{text-align:right}.stats-grid{gap:8px}.stat-card{padding:12px;min-height:82px;gap:9px}.stat-icon{width:36px;height:36px;border-radius:11px;font-size:17px}.stat-copy b{font-size:17px}.stat-copy small{font-size:9px}.stat-copy span{font-size:8px}.devgrid{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.footer-note{flex-direction:column}.termrow .btn{padding:9px 11px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="app-shell" id="app-shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M16 3.5 26 7v7.2c0 6.4-4.1 11.8-10 14.3-5.9-2.5-10-7.9-10-14.3V7l10-3.5Z" stroke="currentColor" stroke-width="2.1"/><path d="M10 17.3c2.1-3.4 4.1-5.1 6-5.1s3.9 1.7 6 5.1M11.7 21h8.6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><circle cx="16" cy="12.1" r="1.4" fill="currentColor"/></svg></div>
+      <div class="brand-copy"><span class="eyebrow">سامانه پایش و مدیریت هوشمند</span><h1>مرکز کنترل EvoHatch</h1><p>داشبورد یکپارچه هاب، دستگاه‌ها و مودم GSM</p></div>
+    </div>
+    <div class="top-actions">
+      <div class="cloud-pill wait" id="cloud-pill"><span class="pulse"></span><span id="cloud-label">در حال بررسی ارتباط...</span></div>
+      <button class="btn secondary sm" id="logout-btn" type="button" onclick="logout()" hidden>خروج امن</button>
+      <button class="btn icon-btn secondary" type="button" title="به‌روزرسانی وضعیت" aria-label="به‌روزرسانی" onclick="poll()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9a7 7 0 0 1 11.9-2L20 12M4 12l2.5 5a7 7 0 0 0 11.9-2"/></svg></button>
+    </div>
+  </header>
+
+  <div class="status-rail">
+    <span class="rail-label">وضعیت لحظه‌ای</span>
+    <div class="chip"><span class="dot" id="c-stm"></span>برد اصلی <b id="c-stm-t">--</b></div>
+    <div class="chip"><span class="dot" id="c-wifi"></span>وای‌فای <b id="c-wifi-t">--</b></div>
+    <div class="chip"><span class="dot" id="c-sim"></span>سیم‌کارت <b id="c-sim-t">--</b></div>
+    <div class="chip"><span class="dot" id="c-gsm"></span>مودم <b id="c-gsm-t">--</b></div>
+    <div class="chip"><span class="dot" id="c-srv"></span>سرور مقصد <b id="c-srv-t">--</b></div>
+  </div>
+  <div class="banner" id="stale"><span class="banner-icon">!</span><span id="stale-text">ارتباط با برد اصلی برقرار نیست؛ ممکن است اطلاعات به‌روز نباشد.</span></div>
+
+  <nav aria-label="بخش‌های پنل">
+    <button class="active" type="button" data-tab="dash" onclick="tab('dash')"><span class="nav-icon">▦</span>نمای کلی</button>
+    <button type="button" data-tab="wifi" onclick="tab('wifi')"><span class="nav-icon">◉</span>وای‌فای</button>
+    <button type="button" data-tab="sim" onclick="tab('sim')"><span class="nav-icon">▤</span>سیم‌کارت و هشدارها</button>
+    <button type="button" data-tab="srv" onclick="tab('srv')"><span class="nav-icon">⌁</span>سرور</button>
+    <button type="button" data-tab="gsm" onclick="tab('gsm')"><span class="nav-icon">▧</span>مودم GSM</button>
+  </nav>
+
+  <section id="tab-dash" class="active">
+    <div class="hero">
+      <div class="hero-copy">
+        <div class="hero-label"><span class="tiny-dot"></span><span id="hero-status">سامانه آماده پایش</span></div>
+        <h2>همه‌چیز، یک‌جا و زنده.</h2>
+        <p>وضعیت هاب و دستگاه‌ها را ببینید، هشدارها را بررسی کنید و تنظیمات را از همین پنل مدیریت کنید.</p>
+      </div>
+      <div class="hero-side"><div class="hero-time" id="clock">--:--</div><div class="hero-date" id="date-line">--</div></div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">▦</div><div class="stat-copy"><small>دستگاه‌های آنلاین</small><b id="kpi-online">۰ / ۱۶</b><span>از کل تجهیزات تعریف‌شده</span></div></div>
+      <div class="stat-card"><div class="stat-icon red">⚠</div><div class="stat-copy"><small>هشدارهای فعال</small><b id="kpi-alerts">۰</b><span>جمع هشدارهای دستگاه‌ها</span></div></div>
+      <div class="stat-card"><div class="stat-icon teal">◉</div><div class="stat-copy"><small>قدرت سیگنال GSM</small><b id="kpi-signal">--</b><span id="kpi-operator">وضعیت مودم نامشخص</span></div></div>
+      <div class="stat-card"><div class="stat-icon green">☁</div><div class="stat-copy"><small>اتصال ابری</small><b id="kpi-cloud">--</b><span id="kpi-cloud-sub">وضعیت ارتباط هاب</span></div></div>
+    </div>
+    <div class="panel-grid">
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="head-icon">◉</span><div><h3>شبکه وای‌فای</h3><p>اتصال هاب به اینترنت</p></div></div><button class="btn secondary sm" type="button" onclick="tab('wifi')">مدیریت</button></div>
+        <div class="row"><span>وضعیت</span><b id="w-st">--</b></div><div class="row"><span>شبکه</span><b id="w-ssid">--</b></div><div class="row"><span>آدرس IP</span><b id="w-ip" dir="ltr">--</b></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="head-icon teal">▤</span><div><h3>سیم‌کارت</h3><p>اعتبار و شماره‌های هشدار</p></div></div><button class="btn secondary sm" type="button" onclick="tab('sim')">مدیریت</button></div>
+        <div class="row"><span>وضعیت</span><b id="s-st">--</b></div><div class="row"><span>اعتبار شارژ</span><b id="s-credit">--</b></div><div class="row"><span>شماره‌های ثبت‌شده</span><b id="s-count">--</b></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="head-icon green">⌁</span><div><h3>سرور مقصد</h3><p>ارسال و بررسی ارتباط</p></div></div><button class="btn secondary sm" type="button" onclick="tab('srv')">تنظیمات</button></div>
+        <div class="row"><span>دامنه</span><b id="v-domain" dir="ltr">--</b></div><div class="row"><span>نرخ ارسال</span><b id="v-rate">--</b></div><div class="row"><span>وضعیت آخرین تست</span><b id="v-ping">--</b></div>
+      </div>
+    </div>
+    <div class="card dev-section">
+      <div class="card-head"><div class="card-title"><span class="head-icon amber">▦</span><div><h3>دستگاه‌های متصل</h3><p>پایش دما، رطوبت، وضعیت و آلارم هر دستگاه</p></div></div><span class="badge info" id="dev-count">۰ / ۱۶ آنلاین</span></div>
+      <div class="devgrid" id="devgrid"></div>
+    </div>
+  </section>
+
+  <section id="tab-wifi">
+    <div class="grid">
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="head-icon">◉</span><div><h3>اتصال به شبکه وای‌فای</h3><p>انتخاب شبکه و ثبت رمز عبور</p></div></div></div>
+        <div class="wfbanner off" id="wf-banner"><span class="dot off" id="wf-bdot"></span><span id="wf-btext">--</span></div>
+        <button class="btn secondary" id="wf-scan" type="button" onclick="scanWifi()" style="width:100%">اسکن شبکه‌های اطراف</button>
+        <label class="field-label" for="wf-list">شبکه وای‌فای</label>
+        <select id="wf-list"><option value="">برای شروع شبکه‌ها را اسکن کنید</option></select>
+        <label class="field-label" for="wf-pass">رمز عبور</label>
+        <input type="password" id="wf-pass" placeholder="رمز شبکه را وارد کنید" autocomplete="new-password" onfocus="this.value=''">
+        <button class="btn" id="wf-conn" type="button" onclick="saveWifi()" style="margin-top:12px;width:100%">اتصال و ذخیره تنظیمات</button>
+        <div id="wf-msg"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="head-icon teal">⌖</span><div><h3>اطلاعات اتصال</h3><p>شبکه و آدرس‌های در دسترس</p></div></div></div>
+        <div class="row"><span>اکسس‌پوینت هاب</span><b id="wf-ap" dir="ltr">--</b></div>
+        <div class="row"><span>آدرس محلی پنل</span><b dir="ltr">192.168.4.1</b></div>
+        <div class="row"><span>آدرس در شبکه وای‌فای</span><b id="wf-ip" dir="ltr">--</b></div>
+        <div class="hint">پنل محلی هاب حتی بدون اینترنت نیز از طریق اکسس‌پوینت خودش در دسترس است. اتصال ابری برای کنترل از راه دور نیازمند اینترنت و تنظیمات بخش استقرار است.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-sim">
+    <div class="grid">
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="head-icon teal">▤</span><div><h3>شماره‌های هشدار</h3><p>تا سه شماره برای ارسال پیامک</p></div></div></div>
+        <label class="field-label" for="ph1">شماره ۱</label><input id="ph1" maxlength="11" placeholder="09xxxxxxxxx" inputmode="tel" dir="ltr">
+        <label class="field-label" for="ph2">شماره ۲</label><input id="ph2" maxlength="11" placeholder="09xxxxxxxxx" inputmode="tel" dir="ltr">
+        <label class="field-label" for="ph3">شماره ۳</label><input id="ph3" maxlength="11" placeholder="09xxxxxxxxx" inputmode="tel" dir="ltr">
+        <div class="row" style="margin-top:9px"><span>اعتبار سیم‌کارت</span><b id="sim-credit2">--</b></div>
+        <button class="btn" type="button" onclick="saveSim()" style="margin-top:13px;width:100%">ذخیره شماره‌ها</button>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="head-icon amber">⚠</span><div><h3>هشدارهای سیم‌کارت</h3><p>نوع رخدادهایی که پیامک می‌گیرند</p></div></div></div>
+        <div class="checks" id="sim-alarms"></div>
+        <button class="btn" type="button" onclick="saveSim()" style="margin-top:13px;width:100%">ذخیره تنظیمات هشدار</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-srv">
+    <div class="grid">
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="head-icon green">⌁</span><div><h3>تنظیمات سرور مقصد</h3><p>دامنه‌ای که هاب برای گزارش‌گیری بررسی می‌کند</p></div></div></div>
+        <label class="field-label" for="sv-domain">دامنه یا آدرس سرور</label><input id="sv-domain" placeholder="monitor.deuteriumstudio.ir" dir="ltr" autocomplete="url">
+        <label class="field-label" for="sv-rate">تعداد ارسال در ساعت</label>
+        <select id="sv-rate"><option value="1">۱ بار</option><option value="2">۲ بار</option><option value="3">۳ بار</option><option value="4">۴ بار</option><option value="6">۶ بار</option><option value="12">۱۲ بار</option><option value="20">۲۰ بار</option><option value="30">۳۰ بار</option><option value="60">۶۰ بار</option></select>
+        <button class="btn" type="button" onclick="saveServer()" style="margin-top:14px;width:100%">اعمال و ذخیره</button>
+        <div class="hint">اتصال ابری WebSocket به monitor.deuteriumstudio.ir جدا از این مقصد گزارش‌گیری پیکربندی می‌شود.</div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="head-icon teal">⌁</span><div><h3>تست ارتباط</h3><p>بررسی پاسخ‌گویی مقصد از طریق هاب</p></div></div></div>
+        <div class="row"><span>نتیجه تست</span><b id="ping-res">تست نشده</b></div><div class="row"><span>آخرین بررسی خودکار</span><b id="ping-auto">--</b></div>
+        <button class="btn success" id="ping-btn" type="button" onclick="pingServer()" style="margin-top:14px;width:100%">اجرای تست ارتباط</button>
+        <div class="hint">این تست از خود برد انجام می‌شود؛ بنابراین حتی اگر مرورگر شما به مقصد دسترسی داشته باشد، نتیجه وابسته به اتصال اینترنت هاب است.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-gsm">
+    <div class="card" style="margin-bottom:13px">
+      <div class="card-head"><div class="card-title"><span class="head-icon teal">▧</span><div><h3>وضعیت مودم GSM</h3><p>اطلاعات زنده سیم‌کارت، شبکه و صف پیامک</p></div></div><span class="badge dim" id="gsm-fsm">--</span></div>
+      <div class="gsmgrid">
+        <div class="gcell"><small>مودم</small><b id="g-ready">--</b></div><div class="gcell"><small>سیم‌کارت</small><b id="g-sim">--</b></div><div class="gcell"><small>شبکه</small><b id="g-net">--</b></div><div class="gcell"><small>اپراتور</small><b id="g-op">--</b></div>
+        <div class="gcell"><small>قدرت آنتن</small><b id="g-sig">--</b></div><div class="gcell"><small>پیامک‌های حافظه</small><b id="g-sms">--</b></div><div class="gcell"><small>صف ارسال</small><b id="g-queue">--</b></div><div class="gcell"><small>تماس</small><b id="g-call">--</b></div>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="head-icon amber">⌘</span><div><h3>فرمان سریع مودم</h3><p>فرمان‌های نگهداری و عیب‌یابی</p></div></div></div>
+        <div class="qbtns">
+          <button class="btn secondary sm" type="button" onclick="gcmd('i')">وضعیت زنده</button><button class="btn secondary sm" type="button" onclick="gcmd('s')">اسکن</button><button class="btn secondary sm" type="button" onclick="gcmd('r')">پیامک خوانده‌نشده</button><button class="btn secondary sm" type="button" onclick="gcmd('d')">پاک‌سازی پیامک</button>
+          <button class="btn secondary sm" type="button" onclick="gcmd('b')">استعلام شارژ</button><button class="btn secondary sm" type="button" onclick="gcmd('p')">توقف / ادامه صف</button><button class="btn danger sm" type="button" onclick="gcmd('x')">خالی‌کردن صف</button><button class="btn danger sm" type="button" onclick="gcmd('h')">قطع تماس</button>
+          <button class="btn secondary sm" type="button" onclick="gcmd('R')">ریست نرم</button><button class="btn danger sm" type="button" onclick="gcmd('K')">ریست سخت</button><button class="btn secondary sm" type="button" onclick="gcmd('L')">سطح لاگ</button><button class="btn secondary sm" type="button" onclick="gcmd('m')">منو</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="head-icon green">✉</span><div><h3>پیامک، تماس و USSD</h3><p>فرمان‌ها مستقیم به مودم برد اصلی می‌روند</p></div></div></div>
+        <label class="field-label" for="g-num">شماره تلفن</label><input id="g-num" placeholder="09xxxxxxxxx" inputmode="tel" dir="ltr">
+        <label class="field-label" for="g-txt">متن پیامک</label><input id="g-txt" placeholder="متن پیام را بنویسید">
+        <div class="grid2" style="margin-top:10px"><button class="btn success" type="button" onclick="gsmSms()">ارسال پیامک</button><button class="btn secondary" type="button" onclick="gsmDial()">برقراری تماس</button></div>
+        <label class="field-label" for="g-ussd" style="margin-top:13px">کد USSD</label><input id="g-ussd" placeholder="*140*1#" dir="ltr"><button class="btn secondary" type="button" onclick="gsmUssd()" style="margin-top:8px;width:100%">ارسال کد USSD</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title"><span class="head-icon">⌘</span><div><h3>کنسول مودم</h3><p>لاگ‌های زنده و ارسال فرمان دستی</p></div></div><div class="term-live"><span class="dot on"></span>لاگ زنده</div></div>
+      <div id="term" dir="ltr" aria-live="polite"></div>
+      <div class="termrow"><input id="g-cmd" placeholder="at+csq  |  sms 0912... hi  |  ..." autocomplete="off" onkeydown="if(event.key==='Enter')gsmSend()"><button class="btn" type="button" onclick="gsmSend()">ارسال فرمان</button></div>
+      <div class="hint">فرمان‌ها به CLI مودم روی برد اصلی ارسال می‌شوند. این دسترسی از پنل ابری محافظت‌شده با رمز عبور نیز استفاده می‌کند.</div>
+    </div>
+  </section>
+
+  <div class="footer-note"><span>پنل محلی و ابری EvoHatch</span><span id="last-update">آخرین به‌روزرسانی: --</span></div>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+  <div class="mbox">
+    <h3 id="m-title">تنظیمات دستگاه</h3><div class="sub" id="m-sub"></div>
+    <div class="grid2"><div><label class="field-label" for="m-sp-t">دمای هدف (°C)</label><input type="number" id="m-sp-t" step="0.1" min="20" max="45"></div><div><label class="field-label" for="m-sp-h">رطوبت هدف (%)</label><input type="number" id="m-sp-h" step="0.1" min="0" max="95"></div></div>
+    <label class="field-label" style="margin-top:14px">هشدارهای فعال</label><div class="checks" id="m-alarms"></div>
+    <label class="chk" style="margin-top:11px"><input type="checkbox" id="m-paired"> اتصال دستگاه فعال باشد</label>
+    <div class="mrow"><button class="btn secondary" type="button" onclick="closeModal()">انصراف</button><button class="btn" type="button" onclick="saveDevice()">ذخیره تنظیمات</button></div>
+  </div>
+</div>
+<div class="auth-screen" id="auth-screen">
+  <form class="auth-card" id="login-form">
+    <div class="auth-brand"><div class="brand-mark"><svg viewBox="0 0 32 32" fill="none"><path d="M16 3.5 26 7v7.2c0 6.4-4.1 11.8-10 14.3-5.9-2.5-10-7.9-10-14.3V7l10-3.5Z" stroke="currentColor" stroke-width="2.1"/><path d="M10 17.3c2.1-3.4 4.1-5.1 6-5.1s3.9 1.7 6 5.1M11.7 21h8.6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><circle cx="16" cy="12.1" r="1.4" fill="currentColor"/></svg></div><div><h2>EvoHatch Monitor</h2><p>پنل امن پایش از راه دور</p></div></div>
+    <h3>ورود به پنل</h3><p class="auth-copy">برای مشاهده وضعیت هاب و مدیریت دستگاه‌ها، نام کاربری و رمز عبور مدیر را وارد کنید.</p>
+    <label class="field-label" for="auth-user">نام کاربری</label><input id="auth-user" name="username" autocomplete="username" required>
+    <label class="field-label" for="auth-pass">رمز عبور</label><input id="auth-pass" name="password" type="password" autocomplete="current-password" required>
+    <div class="auth-error" id="auth-error"></div><button class="btn" id="auth-submit" type="submit">ورود امن</button>
+    <div class="auth-foot">اتصال رمزنگاری‌شده · دسترسی فقط برای کاربران مجاز</div>
+  </form>
+</div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+'use strict';
+const ALARMS=["دمای بالا","دمای پایین","رطوبت بالا","رطوبت پایین","خرابی هیتر","خرابی فن","خرابی سنسور","قطع برق","خاموشی دستگاه"];
+const FORCED=[6,8],ROTS=["خراب","چپ","راست"];
+let S=null,editId=0,termSeq=0,termTimer=null,scanning=false,remoteMode=false,realtime=null,pollTimer=null,scanTimer=null;
+const $=id=>document.getElementById(id);
+function fa(n){return String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtCredit(c){return c?fa(Number(c).toLocaleString('en-US'))+' تومان':'--';}
+function setDot(id,on,warning=false){const e=$(id);if(e)e.className='dot '+(warning?'warn':on?'on':'off');}
+function toast(msg,ok=true){const t=document.createElement('div');t.className='toast '+(ok?'ok':'err');t.textContent=msg;$('toasts').appendChild(t);setTimeout(()=>t.remove(),3400);}
+function tab(name){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('section').forEach(s=>s.classList.toggle('active',s.id==='tab-'+name));if(name==='wifi'&&!scanning)scanWifi();if(name==='gsm'&&!termTimer){termTimer=setInterval(pollTerm,1200);pollTerm();}}
+function alarmList(mask,en){const out=[];for(let i=0;i<ALARMS.length;i++)if(mask&(1<<i))out.push(`<span class="al">${ALARMS[i]}${en!==undefined&&!(en&(1<<i))?' (خاموش)':''}</span>`);return out.join('');}
+function updateClock(){const now=new Date();$('clock').textContent=new Intl.DateTimeFormat('fa-IR',{hour:'2-digit',minute:'2-digit',hour12:false}).format(now);$('date-line').textContent=new Intl.DateTimeFormat('fa-IR',{weekday:'long',day:'numeric',month:'long'}).format(now);}
+function setCloudPill(online,configured){const pill=$('cloud-pill');pill.className='cloud-pill '+(remoteMode?(online?'online':'offline'):(configured?(online?'online':'wait'):'local'));if(remoteMode){$('cloud-label').textContent=online?'اتصال هاب برقرار است':'در انتظار اتصال هاب';}else{$('cloud-label').textContent=configured?(online?'متصل به سرور ابری':'آماده‌سازی اتصال ابری'):'حالت محلی · بدون اتصال ابری';}}
+function render(){
+  if(!S)return;
+  const stm=!!(S.link&&S.link.stm32),cloud=!!(S.cloud&&S.cloud.connected),cloudConfigured=!!(S.cloud&&S.cloud.enabled);
+  setCloudPill(cloud,cloudConfigured);
+  const stale=remoteMode?!cloud:!stm;
+  $('stale').classList.toggle('show',stale);
+  $('stale-text').textContent=remoteMode&&!cloud?'ارتباط هاب با سرور ابری برقرار نیست؛ وضعیت نمایش‌داده‌شده ممکن است قدیمی باشد.':'ارتباط با برد اصلی برقرار نیست؛ ممکن است اطلاعات به‌روز نباشد.';
+  setDot('c-stm',stm);$('c-stm-t').textContent=stm?'متصل':'قطع';
+  setDot('c-wifi',!!S.wifi.connected);$('c-wifi-t').textContent=S.wifi.connected?(S.wifi.ssid||'متصل'):(S.wifi.ssid?'قطع':'تنظیم نشده');
+  setDot('c-sim',!!S.sim.ok);$('c-sim-t').textContent=S.sim.ok?'آماده':'نامشخص';
+  const g=S.gsm||{};setDot('c-gsm',!!g.ready,!!g.seen&&!g.ready);$('c-gsm-t').textContent=g.seen?(g.ready?'آماده':'در حال راه‌اندازی'):'بدون پاسخ';
+  setDot('c-srv',!!S.server.ok);$('c-srv-t').textContent=S.server.ok?'برقرار':'قطع';
+  $('hero-status').textContent=remoteMode?(cloud?'اتصال ابری برقرار است':'هاب هنوز به سرور متصل نشده'):(stm?'ارتباط با برد اصلی برقرار است':'در انتظار ارتباط با برد اصلی');
+  $('w-st').textContent=S.wifi.connected?'متصل':(S.wifi.ssid?'در حال تلاش':'تنظیم نشده');$('w-ssid').textContent=S.wifi.ssid||'--';$('w-ip').textContent=S.wifi.ip||'--';
+  $('s-st').textContent=S.sim.ok?'آماده':'نامشخص';$('s-credit').textContent=fmtCredit(S.sim.credit);$('s-count').textContent=fa((S.sim.phones||[]).filter(Boolean).length)+' شماره';
+  $('v-domain').textContent=S.server.domain||'--';$('v-rate').textContent='هر ساعت '+fa(S.server.rate||0)+' بار';$('v-ping').innerHTML=S.server.ok?'<span class="badge ok">برقرار</span>':'<span class="badge err">قطع</span>';
+  const devices=Array.isArray(S.devices)?S.devices:[];const online=devices.filter(d=>d.online).length;const alerts=devices.reduce((n,d)=>n+(d.online?bitCount(d.alarms||0):0),0);
+  $('kpi-online').textContent=fa(online)+' / '+fa(devices.length);$('kpi-alerts').textContent=fa(alerts);$('kpi-signal').textContent=g.seen?fa(g.bars||0)+' / ۵':'--';$('kpi-operator').textContent=g.op||'قدرت آنتن مودم';$('kpi-cloud').textContent=remoteMode?(cloud?'متصل':'قطع'):(cloudConfigured?(cloud?'متصل':'در انتظار'):'محلی');$('kpi-cloud-sub').textContent=remoteMode?(cloud?'داده‌ها به‌صورت زنده دریافت می‌شوند':'آخرین وضعیت دریافت‌شده'):(cloudConfigured?'اتصال اینترنت هاب':'پنل در شبکه محلی');
+  $('dev-count').textContent=fa(online)+' / '+fa(devices.length)+' آنلاین';
+  renderWifi();renderSim();renderServer();renderGsm();renderDevices();
+  $('last-update').textContent='آخرین به‌روزرسانی: '+new Intl.DateTimeFormat('fa-IR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date());
+}
+function bitCount(v){v=Number(v)||0;let n=0;while(v){n+=v&1;v>>=1;}return n;}
+function renderWifi(){
+  const w=S.wifi||{},b=$('wf-banner'),bt=$('wf-btext'),bd=$('wf-bdot');
+  if(w.connected){b.className='wfbanner ok';bd.className='dot on';bt.textContent='متصل به '+(w.ssid||'شبکه وای‌فای')+(w.ip?' · '+w.ip:'');}
+  else if(w.phase===1){b.className='wfbanner busy';bd.className='dot warn';bt.textContent='در حال اتصال به '+(w.ssid||'شبکه')+'...';}
+  else if(w.phase===3){b.className='wfbanner bad';bd.className='dot off';bt.textContent=w.err===1?'رمز عبور اشتباه است':w.err===2?'شبکه پیدا نشد':'اتصال ناموفق';}
+  else if(w.ssid){b.className='wfbanner off';bd.className='dot off';bt.textContent='شبکه ذخیره‌شده: '+w.ssid;}
+  else{b.className='wfbanner off';bd.className='dot off';bt.textContent='هاب هنوز به وای‌فای متصل نیست';}
+  const m=$('wf-msg');if(w.phase===1){m.className='busy';m.textContent='در حال اتصال به شبکه...';}else if(w.phase===3){m.className='err';m.textContent=w.err===1?'رمز عبور اشتباه بود':w.err===2?'شبکه پیدا نشد':'اتصال ناموفق';}else if(w.connected){m.className='';m.textContent='اتصال برقرار است';}else{m.className='';m.textContent='';}
+  $('wf-ap').textContent=w.ap||'ESP32_HUB_AP';$('wf-ip').textContent=w.ip||'--';
+  const sel=$('wf-list');for(const o of sel.options){if(!o.value)continue;o.textContent=(o.value===w.ssid&&w.connected?'✓ ':'')+o.value;}
+}
+async function scanWifi(){
+  if(scanning)return;scanning=true;const btn=$('wf-scan');btn.disabled=true;btn.textContent='در حال اسکن شبکه‌ها...';
+  try{for(let i=0;i<40;i++){const r=await fetch('/api/scan'+(i===0?'?refresh=1':''),{cache:'no-store'});if(!r.ok)throw new Error('scan');const d=await r.json();if((d.networks&&d.networks.length)||!d.scanning){fillScanList(d.networks||[]);break;}await new Promise(resolve=>setTimeout(resolve,650));}}
+  catch(e){toast(remoteMode?'اسکن انجام نشد؛ اتصال هاب را بررسی کنید':'اسکن شبکه ناموفق بود',false);}
+  btn.disabled=false;btn.textContent='اسکن مجدد شبکه‌ها';scanning=false;
+}
+function fillScanList(list){const sel=$('wf-list'),cur=S&&S.wifi&&S.wifi.connected?S.wifi.ssid:'';sel.innerHTML='';if(list.length){for(const n of list){const o=document.createElement('option');o.value=n;o.textContent=(n===cur?'✓ ':'')+n;sel.appendChild(o);}if(cur&&list.includes(cur))sel.value=cur;}else{const o=document.createElement('option');o.value='';o.textContent='شبکه‌ای پیدا نشد';sel.appendChild(o);}}
+async function saveWifi(){const ssid=$('wf-list').value,pass=$('wf-pass').value;if(!ssid)return toast('ابتدا یک شبکه انتخاب کنید',false);$('wf-conn').disabled=true;const ok=await post('/api/wifi',{ssid,pass});$('wf-conn').disabled=false;if(ok){$('wf-pass').value='';poll();}toast(ok?'درخواست اتصال به '+ssid+' ارسال شد':'ارسال تنظیمات ناموفق بود',ok);}
+function renderSim(){const ae=document.activeElement?document.activeElement.id:'';if(!['ph1','ph2','ph3'].includes(ae)){const p=S.sim.phones||[];$('ph1').value=p[0]||'';$('ph2').value=p[1]||'';$('ph3').value=p[2]||'';}$('sim-credit2').textContent=fmtCredit(S.sim.credit);drawChecks('sim-alarms',S.sim.mask,null);}
+async function saveSim(){const ok=await post('/api/sim',{p1:$('ph1').value.trim(),p2:$('ph2').value.trim(),p3:$('ph3').value.trim(),mask:readChecks('sim-alarms')});if(ok)poll();toast(ok?'تنظیمات سیم‌کارت ارسال شد':'ارسال تنظیمات ناموفق بود',ok);}
+function renderServer(){if(document.activeElement&&document.activeElement.id!=='sv-domain')$('sv-domain').value=S.server.domain||'';$('sv-rate').value=String(S.server.rate||12);$('ping-auto').textContent=S.server.ok?'پاسخ‌گو':'بدون پاسخ';}
+async function saveServer(){const domain=$('sv-domain').value.trim();if(!domain)return toast('دامنه سرور را وارد کنید',false);const ok=await post('/api/server',{domain,rate:+$('sv-rate').value});if(ok)poll();toast(ok?'تنظیمات سرور ذخیره شد':'ذخیره تنظیمات ناموفق بود',ok);}
+async function pingServer(){$('ping-btn').disabled=true;$('ping-res').textContent='در حال بررسی...';try{const r=await fetch('/api/ping',{cache:'no-store'});const d=await r.json();$('ping-res').innerHTML=d.ok?'<span class="badge ok">پاسخ دریافت شد</span>':'<span class="badge err">بدون پاسخ</span>';if(!r.ok)toast(d.error||'ارتباط با هاب برقرار نیست',false);}catch(e){$('ping-res').textContent='خطا در بررسی';}finally{$('ping-btn').disabled=false;}}
+function renderGsm(){const g=S.gsm||{};$('gsm-fsm').textContent=g.seen?(g.fsm+(g.step?' / '+g.step:'')):'بدون پاسخ';const set=(id,txt,cls)=>{const e=$(id);e.textContent=txt;if(cls!==undefined)e.className=cls;};set('g-ready',g.seen?(g.ready?'آماده':'راه‌اندازی'):'--',g.ready?'ok':'warn');set('g-sim',g.seen?(g.sim?'آماده':'خطا'):'--',g.sim?'ok':'err');set('g-net',g.seen?(g.net?'ثبت شده':'بدون شبکه'):'--',g.net?'ok':'err');set('g-op',g.op||'--');set('g-sig',g.seen?(fa(g.rssi)+' dBm · '+fa(g.bars)+'/۵'):'--',g.bars>=3?'ok':(g.bars>0?'warn':'err'));set('g-sms',g.seen?fa(g.sms_used)+' / '+fa(g.sms_total):'--');set('g-queue',g.seen?((g.paused?'متوقف · ':'')+fa(g.qsize)+' / '+fa(g.qcap)):'--',g.paused?'warn':(g.qsize?'acc':'ok'));set('g-call',g.seen?(g.call+(g.peer&&g.call!=='idle'?' ← '+g.peer:'')):'--',(g.call&&g.call!=='idle')?'warn':'');}
+function termLineClass(t){if(/ERROR|\[!\]|CRITICAL|FAIL|code=-1/i.test(t))return'err';if(/WARN|PAUSED|Unknown/i.test(t))return'warn';if(/Succeeded|OK|READY|\[SMS\]/i.test(t))return'ok';if(/JOB#|USSD|CALL|Queued/i.test(t))return'info';if(/^gsm>|^#/.test(t))return'sys';return'';}
+async function pollTerm(){try{const r=await fetch('/api/gsm?after='+termSeq,{cache:'no-store'});if(!r.ok)return;const d=await r.json();if(!d.logs||!d.logs.length)return;const term=$('term'),stick=term.scrollTop+term.clientHeight>=term.scrollHeight-30;for(const l of d.logs){const div=document.createElement('div');div.className='tl '+termLineClass(l.t);div.textContent=l.t;term.appendChild(div);termSeq=l.seq;}while(term.children.length>400)term.removeChild(term.firstChild);if(stick)term.scrollTop=term.scrollHeight;}catch(e){}}
+async function gcmd(cmd){const ok=await post('/api/gsm',{cmd});toast(ok?'فرمان به مودم ارسال شد':'فرمان ارسال نشد؛ اتصال هاب را بررسی کنید',ok);}
+function gsmSend(){const v=$('g-cmd').value.trim();if(!v)return;$('g-cmd').value='';gcmd(v);}
+async function gsmSms(){const n=$('g-num').value.trim(),t=$('g-txt').value.trim();if(!n||!t)return toast('شماره و متن پیامک را وارد کنید',false);await gcmd('sms '+n+' '+t);$('g-txt').value='';}
+function gsmDial(){const n=$('g-num').value.trim();if(!n)return toast('شماره تلفن را وارد کنید',false);gcmd('dial '+n);}
+function gsmUssd(){const c=$('g-ussd').value.trim();if(!c)return toast('کد USSD را وارد کنید',false);gcmd('ussd '+c);}
+function renderDevices(){const g=$('devgrid'),devices=Array.isArray(S.devices)?S.devices:[];if(!g.dataset.built){g.dataset.built='1';g.innerHTML=devices.map(()=>`<article class="dev"><div class="dev-top"><div class="dev-name-wrap"><span class="dev-number"></span><span class="dev-name"></span></div><span class="badge"></span></div><div class="dev-values"><div class="metric"><small>دما</small><b class="t">--</b><i class="ts"></i></div><div class="metric"><small>رطوبت</small><b class="h">--</b><i class="hs"></i></div></div><div class="alarms"></div><div class="dev-foot"><span class="rot"></span><button class="btn secondary sm" type="button">تنظیمات دستگاه</button></div></article>`).join('');g.querySelectorAll('.dev').forEach((el,i)=>{el.querySelector('button').onclick=()=>openModal(i);});}devices.forEach((d,i)=>{const el=g.children[i];if(!el)return;el.className='dev'+(!d.online?' off':'')+(d.online&&d.alarms?' bad':'');el.querySelector('.dev-number').textContent=fa(d.id);el.querySelector('.dev-name').textContent='دستگاه '+fa(d.id);const b=el.querySelector('.badge');if(!d.online){b.className='badge dim';b.textContent='آفلاین';}else if(d.alarms){b.className='badge err';b.textContent='هشدار';}else{b.className='badge ok';b.textContent='آنلاین';}el.querySelector('.t').textContent=d.online?Number(d.temp).toFixed(1)+'°':'--';el.querySelector('.h').textContent=d.online?Number(d.hum).toFixed(1)+'%':'--';el.querySelector('.ts').textContent='هدف: '+Number(d.sp_t).toFixed(1)+'°';el.querySelector('.hs').textContent='هدف: '+Number(d.sp_h).toFixed(1)+'%';el.querySelector('.alarms').innerHTML=d.online?alarmList(d.alarms,d.en):'';el.querySelector('.rot').textContent='چرخش: '+(ROTS[d.rot]||ROTS[0]);});}
+function drawChecks(container,mask,disabledBits){const el=$(container);if(el.dataset.mask===String(mask)&&el.dataset.built)return;el.dataset.built='1';el.dataset.mask=String(mask);el.innerHTML=ALARMS.map((name,i)=>{const forced=disabledBits===null?false:disabledBits.includes(i),on=forced||!!(mask&(1<<i));return `<label class="chk${forced?' dis':''}"><input type="checkbox" data-i="${i}" ${on?'checked':''} ${forced?'disabled':''}>${name}${forced?' (اجباری)':''}</label>`;}).join('');}
+function readChecks(container){let m=0;$(container).querySelectorAll('input').forEach(c=>{if(c.checked)m|=1<<Number(c.dataset.i);});return m;}
+function openModal(i){if(!S||!S.devices[i])return;editId=S.devices[i].id;const d=S.devices[i];$('m-title').textContent='تنظیمات دستگاه '+fa(editId);$('m-sub').textContent=d.online?`دما ${Number(d.temp).toFixed(1)}° · رطوبت ${Number(d.hum).toFixed(1)}%`:'دستگاه در حال حاضر آفلاین است';$('m-sp-t').value=Number(d.sp_t).toFixed(1);$('m-sp-h').value=Number(d.sp_h).toFixed(1);$('m-paired').checked=!!d.paired;delete $('m-alarms').dataset.built;$('m-alarms').dataset.mask='';drawChecks('m-alarms',d.en,FORCED);$('modal').classList.add('open');}
+function closeModal(){$('modal').classList.remove('open');}
+async function post(url,body){try{const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(r.status===401&&remoteMode){showAuth('نشست شما پایان یافته است؛ لطفاً دوباره وارد شوید.');return false;}const d=await r.json();return r.ok&&d.ok===true;}catch(e){return false;}}
+async function saveDevice(){const t=Number($('m-sp-t').value),h=Number($('m-sp-h').value);if(!Number.isFinite(t)||t<20||t>45||!Number.isFinite(h)||h<0||h>95)return toast('دمای هدف یا رطوبت خارج از محدوده مجاز است',false);const ok=await post('/api/device',{id:editId,sp_t:t,sp_h:h,mask:readChecks('m-alarms'),paired:$('m-paired').checked});closeModal();if(ok)poll();toast(ok?'تنظیمات دستگاه ارسال شد':'ذخیره تنظیمات ناموفق بود',ok);}
+async function poll(){try{const r=await fetch('/api/state',{cache:'no-store'});if(r.status===401&&remoteMode){showAuth('برای ادامه دوباره وارد شوید.');return;}if(!r.ok)throw new Error('state');S=await r.json();render();}catch(e){['c-stm','c-wifi','c-sim','c-gsm','c-srv'].forEach(id=>setDot(id,false));}}
+function showAuth(message=''){if(pollTimer){clearInterval(pollTimer);pollTimer=null;}if(realtime){realtime.close();realtime=null;}$('app-shell').style.display='none';$('auth-screen').classList.add('show');$('logout-btn').hidden=true;if(message){$('auth-error').textContent=message;$('auth-error').classList.add('show');}else{$('auth-error').classList.remove('show');}}
+function hideAuth(){$('auth-screen').classList.remove('show');$('app-shell').style.display='block';$('logout-btn').hidden=!remoteMode;$('auth-error').classList.remove('show');}
+function startPolling(){if(pollTimer)clearInterval(pollTimer);poll();pollTimer=setInterval(poll,remoteMode?6000:1800);}
+function connectRealtime(){if(!remoteMode||!window.WebSocket)return;try{const scheme=location.protocol==='https:'?'wss':'ws';const ws=new WebSocket(scheme+'://'+location.host+'/ws/browser');realtime=ws;ws.onopen=()=>{const pill=$('cloud-pill');if(pill)window.setTimeout(()=>{if(realtime===ws&&ws.readyState===WebSocket.OPEN&&S)render();},100);};ws.onmessage=event=>{try{const msg=JSON.parse(event.data);if(msg.type==='state'&&msg.state){S=msg.state;render();}}catch(e){}};ws.onclose=()=>{if(realtime===ws){realtime=null;if(remoteMode&&$('auth-screen').classList.contains('show')===false)setTimeout(connectRealtime,3500);}};}catch(e){}}
+function startRemote(){connectRealtime();startPolling();}
+async function boot(){updateClock();setInterval(updateClock,15000);let remoteCheck=null;try{remoteCheck=await fetch('/api/auth/me',{cache:'no-store'});}catch(e){}if(remoteCheck&&remoteCheck.status!==404){remoteMode=true;let d={};try{d=await remoteCheck.json();}catch(e){}if(!d.authenticated){showAuth();return;}hideAuth();startRemote();return;}remoteMode=false;hideAuth();startPolling();}
+async function logout(){if(!remoteMode)return;try{await fetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});}catch(e){}showAuth('از پنل خارج شدید.');}
+$('login-form').addEventListener('submit',async e=>{e.preventDefault();const btn=$('auth-submit');btn.disabled=true;btn.textContent='در حال ورود...';$('auth-error').classList.remove('show');try{const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('auth-user').value,password:$('auth-pass').value})});const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'ورود ناموفق بود');remoteMode=true;hideAuth();startRemote();$('auth-pass').value='';}catch(err){$('auth-error').textContent=err.message||'نام کاربری یا رمز عبور نادرست است';$('auth-error').classList.add('show');}finally{btn.disabled=false;btn.textContent='ورود امن';}});
+$('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+boot();
+</script>
+</body>
+</html>

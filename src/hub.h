@@ -57,6 +57,9 @@ struct HubState
     // link health
     bool stm32_ok = false;
     uint32_t last_rx_ms = 0;
+    bool cloud_configured = false;
+    bool cloud_connected = false;
+    uint32_t cloud_last_tx_ms = 0;
 
     // WiFi (owned by ESP32, saved in NVS)
     char wifi_ssid[33] = "";
