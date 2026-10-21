@@ -334,10 +334,25 @@ function createHubServer(options = {}) {
     if (!message || typeof message !== 'object' || Array.isArray(message)) return;
     lastSeen = Date.now();
 
-    if (message.type === 'state' && message.state && typeof message.state === 'object' && !Array.isArray(message.state)) {
-      lastState = message.state;
-      if (scanPending && lastState.wifi && !lastState.wifi.scanning) scanPending = false;
-      broadcastState();
+    if (message.type === 'state') {
+      // The ESP32 firmware spreads the hub_to_json() fields next to "type"
+      // ({"type":"state","wifi":{...},"devices":[...]}, see cloud_link.cpp).
+      // A nested {"state":{...}} envelope is also accepted so future
+      // firmware revisions can switch shapes without breaking the relay.
+      let state = null;
+      if (message.state && typeof message.state === 'object' && !Array.isArray(message.state)) {
+        state = message.state;
+      } else {
+        const { type: _ignored, ...fields } = message;
+        const looksLikeState = (fields.wifi && typeof fields.wifi === 'object' && !Array.isArray(fields.wifi)) ||
+          Array.isArray(fields.devices);
+        if (looksLikeState) state = fields;
+      }
+      if (state) {
+        lastState = state;
+        if (scanPending && lastState.wifi && !lastState.wifi.scanning) scanPending = false;
+        broadcastState();
+      }
       return;
     }
     if (message.type === 'gsm') {

@@ -124,11 +124,24 @@ test('authenticated browser receives live state and controls are forwarded to th
     gsm: { seen: true, ready: true, sim: true, net: true, op: 'Test', rssi: -63, bars: 4, sms_used: 0, sms_total: 20, paused: false, qsize: 0, qcap: 10, call: 'idle', peer: '' },
     devices: [],
   };
-  device.send(JSON.stringify({ type: 'state', state: liveState }));
+  // The ESP32 firmware spreads the hub state next to "type" (cloud_link.cpp);
+  // the relay must accept that flat frame, not only a nested envelope.
+  device.send(JSON.stringify({ type: 'state', ...liveState }));
   const stateResponse = await fetch(`${base}/api/state`, { headers: { cookie } });
   const state = await stateResponse.json();
   assert.equal(state.cloud.connected, true);
   assert.equal(state.wifi.ssid, 'Studio-WiFi');
+
+  // A nested {"state":{...}} envelope stays accepted for forward compatibility.
+  const nestedState = { ...liveState, wifi: { ...liveState.wifi, ssid: 'Nested-WiFi' } };
+  const browserUpdate = once(browser, 'message')
+    .then(([raw]) => JSON.parse(raw.toString()));
+  device.send(JSON.stringify({ type: 'state', state: nestedState }));
+  const update = await browserUpdate;
+  assert.equal(update.type, 'state');
+  assert.equal(update.state.wifi.ssid, 'Nested-WiFi');
+  const nestedResponse = await fetch(`${base}/api/state`, { headers: { cookie } });
+  assert.equal((await nestedResponse.json()).wifi.ssid, 'Nested-WiFi');
 
   const commandPromise = once(device, 'message').then(([raw]) => JSON.parse(raw.toString()));
   const commandResponsePromise = fetch(`${base}/api/gsm`, {

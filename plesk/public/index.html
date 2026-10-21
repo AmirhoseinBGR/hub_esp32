@@ -127,6 +127,23 @@ input[type=checkbox]{accent-color:var(--blue)}
 .termrow{display:flex;gap:7px;margin-top:8px;direction:ltr}.termrow input{flex:1;direction:ltr;text-align:left;background:#fbfcfe;font-family:'Cascadia Code','Consolas','Courier New',monospace}
 .term-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
 .term-live{display:flex;align-items:center;gap:6px;color:#8190a6;font-size:9.5px}.term-live .dot{width:7px;height:7px}
+.cfg-toolbar{display:flex;align-items:flex-end;gap:11px;flex-wrap:wrap}
+.cfg-device{flex:1 1 170px;max-width:280px}
+.cfg-actions{display:flex;gap:7px;flex-wrap:wrap}
+#cfg-banner{margin:13px 0 0}
+.cfg-echo{min-height:15px;margin-top:7px;color:#91a0b5;font-size:10px;text-align:left;font-family:'Cascadia Code','Consolas','Courier New',monospace}
+.cfg-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:13px}
+.cfg-field{display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid #eff2f7;border-radius:9px;transition:background .15s}
+.cfg-field:last-child{border-bottom:0}
+.cfg-field.busy{background:#f2f7ff}
+.cfg-label{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cfg-name{color:#3c5069;font-size:10.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cfg-key{color:#9fb0c8;font-size:8.5px;font-family:'Cascadia Code','Consolas','Courier New',monospace;letter-spacing:.4px}
+.cfg-field input,.cfg-field select{width:112px;flex:0 0 auto;padding:8px 9px;font-size:11px;direction:ltr;text-align:left}
+.cfg-field select.cfg-bool{direction:rtl;text-align:right}
+.cfg-field input.dirty,.cfg-field select.dirty{border-color:#e0aa4e;background:#fffaf0;box-shadow:0 0 0 3px rgba(184,117,17,.07)}
+.cfg-field .btn{flex:0 0 auto}
+@media(max-width:520px){.cfg-groups{grid-template-columns:1fr}.cfg-field input,.cfg-field select{width:94px}.cfg-name{font-size:10px}}
 .modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(21,35,59,.42);backdrop-filter:blur(4px)}.modal.open{display:flex}
 .mbox{width:100%;max-width:460px;max-height:90vh;overflow:auto;padding:22px;background:white;border:1px solid rgba(255,255,255,.7);border-radius:19px;box-shadow:0 25px 75px rgba(24,39,66,.2)}
 .mbox h3{font-size:15px;font-weight:800;color:#233851}.mbox .sub{font-size:10px;color:#8290a6;margin:5px 0 12px}.mrow{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
@@ -172,6 +189,7 @@ input[type=checkbox]{accent-color:var(--blue)}
     <button type="button" data-tab="sim" onclick="tab('sim')"><span class="nav-icon">▤</span>سیم‌کارت و هشدارها</button>
     <button type="button" data-tab="srv" onclick="tab('srv')"><span class="nav-icon">⌁</span>سرور</button>
     <button type="button" data-tab="gsm" onclick="tab('gsm')"><span class="nav-icon">▧</span>مودم GSM</button>
+    <button type="button" data-tab="settings" onclick="tab('settings')"><span class="nav-icon">⚙</span>تنظیمات ریموت</button>
   </nav>
 
   <section id="tab-dash" class="active">
@@ -302,6 +320,27 @@ input[type=checkbox]{accent-color:var(--blue)}
     </div>
   </section>
 
+  <section id="tab-settings">
+    <div class="card" style="margin-bottom:13px">
+      <div class="card-head"><div class="card-title"><span class="head-icon amber">⚙</span><div><h3>تنظیمات ریموت دستگاه جوجه‌کشی</h3><p>تنظیمات داخلی هر دستگاه، با خواندن و تأیید از خود برد اصلی</p></div></div><span class="badge info">با تأیید برد اصلی</span></div>
+      <div class="hint" style="margin:0 0 12px">مقادیر مستقیم از دستگاه خوانده می‌شوند و موفقیت هر تغییر فقط پس از ذخیره و خواندن مجدد توسط برد اصلی اعلام می‌شود. خانهٔ خالی یعنی مقدار هنوز خوانده نشده است؛ مقدار ویرایش‌شده با حاشیهٔ زرد مشخص می‌شود و تا تأیید دستگاه، اعمال‌شده محسوب نمی‌شود.</div>
+      <div class="cfg-toolbar">
+        <div class="cfg-device">
+          <label class="field-label" for="cfg-id" style="margin-top:0">دستگاه مقصد</label>
+          <select id="cfg-id"></select>
+        </div>
+        <div class="cfg-actions">
+          <button class="btn" id="cfg-readall" type="button" onclick="readAllSettings()">خواندن همهٔ تنظیمات</button>
+          <button class="btn secondary" type="button" onclick="settingsStatus('STATUS')">وضعیت دستگاه</button>
+          <button class="btn secondary" type="button" onclick="settingsStatus('ALARM')">هشدارهای دستگاه</button>
+        </div>
+      </div>
+      <div class="wfbanner off" id="cfg-banner"><span class="dot off" id="cfg-bdot"></span><span id="cfg-result" role="status" aria-live="polite">هنوز از دستگاه خوانده نشده است</span></div>
+      <div class="cfg-echo" id="cfg-echo" dir="ltr"></div>
+    </div>
+    <div class="cfg-groups" id="cfg-groups"></div>
+  </section>
+
   <div class="footer-note"><span>پنل محلی و ابری EvoHatch</span><span id="last-update">آخرین به‌روزرسانی: --</span></div>
 </div>
 
@@ -411,6 +450,113 @@ function connectRealtime(){if(!remoteMode||!window.WebSocket)return;try{const sc
 function startRemote(){connectRealtime();startPolling();}
 async function boot(){updateClock();setInterval(updateClock,15000);let remoteCheck=null;try{remoteCheck=await fetch('/api/auth/me',{cache:'no-store'});}catch(e){}if(remoteCheck&&remoteCheck.status!==404){remoteMode=true;let d={};try{d=await remoteCheck.json();}catch(e){}if(!d.authenticated){showAuth();return;}hideAuth();startRemote();return;}remoteMode=false;hideAuth();startPolling();}
 async function logout(){if(!remoteMode)return;try{await fetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});}catch(e){}showAuth('از پنل خارج شدید.');}
+const SETTINGS_GROUPS=[
+ {title:'هدف‌ها و کالیبراسیون',sub:'دمای و رطوبت هدف و آفست سنسورها',icon:'⌖',cls:'teal',fields:[['TS','دمای هدف',10,45,0.1],['TC','کالیبراسیون دما',-100,100,0.001],['HS','رطوبت هدف',10,95,0.1],['HC','کالیبراسیون رطوبت',-100,100,0.001]]},
+ {title:'حدود هشدار دما و رطوبت',sub:'بازهٔ مجاز و فعال بودن هشدارها',icon:'⚠',cls:'amber',fields:[['TLO','حد پایین دما',-100,150,0.001],['THI','حد بالای دما',-100,150,0.001],['HLO','حد پایین رطوبت',0,100,0.001],['HHI','حد بالای رطوبت',0,100,0.001],['TEA','هشدار دما',0,1,1],['HEA','هشدار رطوبت',0,1,1]]},
+ {title:'هشدار خرابی تجهیزات',sub:'هیترها، فن، چرخش، رطوبت‌ساز و هاب',icon:'▦',cls:'',fields:[['W1','هشدار هیتر ۱',0,1,1],['W2','هشدار هیتر ۲',0,1,1],['W3','هشدار هیتر ۳',0,1,1],['WF','هشدار فن',0,1,1],['WR','هشدار چرخش',0,1,1],['WH','هشدار رطوبت‌ساز',0,1,1],['WB','هشدار هاب',0,1,1]]},
+ {title:'جریان مرجع تجهیزات',sub:'مقادیر مرجع برای تشخیص خرابی',icon:'⌁',cls:'green',fields:[['H1','جریان هیتر ۱',0,100,0.001],['H2','جریان هیتر ۲',0,100,0.001],['H3','جریان هیتر ۳',0,100,0.001],['FN','جریان فن',0,100,0.001],['RT','جریان چرخش',0,100,0.001],['HU','جریان رطوبت‌ساز',0,100,0.001]]},
+ {title:'چرخش و کنترل PID دما',sub:'فاصلهٔ چرخش سینی و ضرایب کنترل دما',icon:'↻',cls:'',fields:[['RI','فاصله چرخش (دقیقه)',0,65535,1],['TKP','ضریب P دما',0,10000,0.001],['TKI','ضریب I دما',0,10000,0.001],['TKD','ضریب D دما',0,10000,0.001],['TMAX','دوره PID دما (میلی‌ثانیه)',1,86400000,1]]},
+ {title:'کنترل PID رطوبت',sub:'ضرایب و دورهٔ کنترل رطوبت',icon:'≋',cls:'teal',fields:[['HKP','ضریب P رطوبت',0,10000,0.001],['HKI','ضریب I رطوبت',0,10000,0.001],['HKD','ضریب D رطوبت',0,10000,0.001],['HMAX','دوره PID رطوبت (میلی‌ثانیه)',1,86400000,1]]},
+];
+const SETTINGS_FIELDS=SETTINGS_GROUPS.flatMap(g=>g.fields);
+let settingsBusy=false;
+function cfgFieldHtml(key,name,min,max,step){
+  const ctrl=(min===0&&max===1&&step===1)
+    ?`<select class="cfg-bool" id="cfg-${key}"><option value="">خوانده نشده</option><option value="1">روشن</option><option value="0">خاموش</option></select>`
+    :`<input id="cfg-${key}" type="number" inputmode="decimal" min="${min}" max="${max}" step="${step}" placeholder="خوانده نشده">`;
+  return `<div class="cfg-field" id="cfg-field-${key}"><div class="cfg-label"><span class="cfg-name">${name}</span><span class="cfg-key" dir="ltr">${key}</span></div>${ctrl}<button class="btn secondary sm" type="button" data-key="${key}" data-mode="get">خواندن</button><button class="btn sm" type="button" data-key="${key}" data-mode="set">اعمال</button></div>`;
+}
+function setupSettings(){
+  const sel=$('cfg-id');
+  for(let i=1;i<=16;i++)sel.add(new Option('دستگاه '+fa(i),i));
+  sel.onchange=()=>{
+    for(const [key] of SETTINGS_FIELDS){const el=$('cfg-'+key);if(el){el.value='';el.classList.remove('dirty');}}
+    cfgEcho('');
+    cfgReport('برای دستگاه '+fa(sel.value)+' هنوز مقداری خوانده نشده است','off');
+  };
+  const host=$('cfg-groups');
+  host.innerHTML=SETTINGS_GROUPS.map(g=>`<div class="card cfg-card"><div class="card-head"><div class="card-title"><span class="head-icon ${g.cls}">${g.icon}</span><div><h3>${g.title}</h3><p>${g.sub}</p></div></div></div>${g.fields.map(f=>cfgFieldHtml(...f)).join('')}</div>`).join('');
+  host.addEventListener('click',e=>{const b=e.target.closest('button[data-key]');if(b)settingAction(b.dataset.key,b.dataset.mode==='set');});
+  const mark=e=>{if(e.target.id&&e.target.id.startsWith('cfg-'))e.target.classList.add('dirty');};
+  host.addEventListener('input',mark);host.addEventListener('change',mark);
+}
+function cfgReport(text,kind='off'){
+  $('cfg-banner').className='wfbanner '+kind;
+  $('cfg-bdot').className='dot '+(kind==='ok'?'on':kind==='bad'?'off':kind==='busy'?'warn':'');
+  $('cfg-result').textContent=text;
+}
+function cfgEcho(cmd){$('cfg-echo').textContent=cmd?('> '+cmd):'';}
+function cfgLock(on,key){
+  document.querySelectorAll('#tab-settings button,#cfg-id').forEach(el=>{el.disabled=on;});
+  document.querySelectorAll('.cfg-field.busy').forEach(el=>el.classList.remove('busy'));
+  if(on&&key){const f=$('cfg-field-'+key);if(f)f.classList.add('busy');}
+}
+function cfgErrorText(t){return /خطا|نامعتبر|تأیید نشد|رد شد|error|fail/i.test(t||'');}
+async function settingsCommand(cmd){
+  if(settingsBusy)throw new Error('فرمان دیگری در حال اجراست؛ کمی صبر کنید');
+  settingsBusy=true;cfgEcho(cmd);
+  try{
+    const response=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd})});
+    if(response.status===401&&remoteMode){showAuth('نشست شما پایان یافته است؛ لطفاً دوباره وارد شوید.');throw new Error('نیاز به ورود مجدد است');}
+    if(response.status===409)throw new Error('هاب مشغول اجرای فرمان دیگری است');
+    if(response.status===503||response.status===504)throw new Error('هاب به سرور ابری متصل نیست یا در مهلت مقرر پاسخ نداد');
+    if(response.status===202){
+      // Local hub API: the command is accepted, then the STM32 reply is
+      // polled through the correlated token until it is confirmed.
+      const {token}=await response.json();
+      const deadline=Date.now()+20000;
+      while(Date.now()<deadline){
+        await new Promise(resolve=>setTimeout(resolve,250));
+        const r=await fetch('/api/settings?token='+token,{cache:'no-store'});
+        if(!r.ok)throw new Error('نتیجهٔ فرمان در دسترس نیست؛ تأیید نشد');
+        const result=await r.json();
+        if(!result.pending)return result.text||'';
+      }
+      throw new Error('پاسخ دستگاه نرسید؛ اعمال تنظیمات تأیید نشد');
+    }
+    // Cloud relay: one JSON answer after the hub confirms the command.
+    const d=await response.json().catch(()=>null);
+    if(response.ok&&d&&d.ok===true)return d.text||'';
+    throw new Error((d&&d.error)||'ارسال فرمان ناموفق بود');
+  }catch(e){
+    if(e instanceof TypeError)throw new Error('ارتباط با هاب برقرار نشد');
+    throw e;
+  }finally{settingsBusy=false;}
+}
+async function settingAction(key,write){
+  const id=$('cfg-id').value,input=$('cfg-'+key);
+  if(write&&(input.value===''||!input.checkValidity())){cfgReport('برای این فیلد یک مقدار معتبر در بازهٔ مجاز وارد کنید','bad');input.focus();return;}
+  cfgReport('در انتظار پاسخ دستگاه '+fa(id)+'…','busy');cfgLock(true,key);
+  try{
+    const text=await settingsCommand(write?`SET ${id} ${key}=${input.value}`:`GET ${id} ${key}`);
+    if($('cfg-id').value!==id){cfgReport('دستگاه مقصد تغییر کرده است؛ ابتدا تنظیمات این دستگاه را بخوانید','off');return;}
+    const found=text.match(new RegExp('(?:^| )'+key+'=(-?[0-9]+(?:\\.[0-9]+)?)'));
+    const ok=!cfgErrorText(text);
+    if(found){input.value=input.tagName==='SELECT'?(Number(found[1])?'1':'0'):found[1];input.classList.remove('dirty');}
+    else if(write&&ok)input.classList.remove('dirty');
+    cfgReport(text||'پاسخی از دستگاه دریافت نشد',ok?'ok':'bad');
+  }catch(e){cfgReport(e.message,'bad');}
+  finally{cfgLock(false);}
+}
+async function readAllSettings(){
+  const id=$('cfg-id').value,btn=$('cfg-readall'),label=btn.textContent,total=SETTINGS_FIELDS.length;
+  let done=0;
+  for(const [key] of SETTINGS_FIELDS){
+    if($('cfg-id').value!==id)break;
+    done++;btn.textContent='در حال خواندن… '+fa(done)+' از '+fa(total);
+    await settingAction(key,false);
+  }
+  btn.textContent=label;
+  if($('cfg-id').value===id)cfgReport('خواندن تنظیمات دستگاه '+fa(id)+' کامل شد','ok');
+}
+async function settingsStatus(kind){
+  const id=$('cfg-id').value;
+  cfgReport('در انتظار پاسخ دستگاه '+fa(id)+'…','busy');cfgLock(true);
+  try{const text=await settingsCommand(kind+' '+id);cfgReport(text||'پاسخی دریافت نشد',cfgErrorText(text)?'bad':'ok');}
+  catch(e){cfgReport(e.message,'bad');}
+  finally{cfgLock(false);}
+}
+setupSettings();
 $('login-form').addEventListener('submit',async e=>{e.preventDefault();const btn=$('auth-submit');btn.disabled=true;btn.textContent='در حال ورود...';$('auth-error').classList.remove('show');try{const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('auth-user').value,password:$('auth-pass').value})});const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'ورود ناموفق بود');remoteMode=true;hideAuth();startRemote();$('auth-pass').value='';}catch(err){$('auth-error').textContent=err.message||'نام کاربری یا رمز عبور نادرست است';$('auth-error').classList.add('show');}finally{btn.disabled=false;btn.textContent='ورود امن';}});
 $('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 boot();
