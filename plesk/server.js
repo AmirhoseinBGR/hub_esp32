@@ -583,7 +583,12 @@ function createHubServer(options = {}) {
   return { app, server, wss, listen, close, config };
 }
 
-if (require.main === module) {
+function isIISNodeProcess(env = process.env) {
+  const port = env.PORT;
+  return typeof port === 'string' && port.startsWith('\\\\.\\pipe\\');
+}
+
+if (require.main === module || isIISNodeProcess()) {
   let hub;
   try {
     hub = createHubServer();
@@ -606,4 +611,4 @@ if (require.main === module) {
   process.on('SIGTERM', shutdown);
 }
 
-module.exports = { createHubServer, defaultState, readConfig, safeEqual, verifySession };
+module.exports = { createHubServer, defaultState, isIISNodeProcess, readConfig, safeEqual, verifySession };

@@ -7,7 +7,7 @@ const os = require('node:os');
 const fs = require('node:fs');
 const { once } = require('node:events');
 const WebSocket = require('ws');
-const { createHubServer, readConfig } = require('../server');
+const { createHubServer, isIISNodeProcess, readConfig } = require('../server');
 
 const config = {
   host: '127.0.0.1', port: 0, publicOrigin: '',
@@ -20,6 +20,8 @@ const config = {
 
 test('configuration preserves IISNode named-pipe PORT values', () => {
   const pipePath = String.raw`\\.\pipe\evohatch-test`;
+  assert.equal(isIISNodeProcess({ PORT: pipePath }), true);
+  assert.equal(isIISNodeProcess({ PORT: '3000' }), false);
   const parsed = readConfig({
     PORT: pipePath,
     ADMIN_USERNAME: config.adminUsername,
