@@ -1,6 +1,7 @@
 /** hub.cpp - state storage + apply functions + JSON serialization. */
 #include "hub.h"
 #include "config.h"
+#include "json_arena.h"
 
 HubState hub;
 
@@ -130,4 +131,26 @@ void hub_to_json(JsonDocument &doc)
         o["en"] = d.alarm_enable;
         o["paired"] = d.paired;
     }
+}
+
+// Fixed arena for hub_state_json(): the state document is rebuilt every
+// ~1.2 s for the cloud link and on every local panel poll. Building it on
+// the heap (a fresh JsonDocument plus a String) churned malloc/free until
+// the heap was too fragmented for the mbedTLS handshake and the WSS link
+// could never reconnect (WiFiClientSecure "start_ssl_client: -1") - see
+// json_arena.h. Sizing measured against ArduinoJson 7.4: the state
+// document allocates ~8.3 KB (two variant pools plus copied strings) on a
+// 64-bit host; ESP32 slots are smaller, so 16 KB leaves wide margin.
+// Exhaustion only skips a publish instead of corrupting memory.
+static JsonArena<16384> stateArena;
+
+size_t hub_state_json(char *out, size_t cap, const char *frame_type)
+{
+    if (!out || cap == 0) return 0;
+    stateArena.reset();
+    JsonDocument doc(&stateArena);
+    if (frame_type) doc["type"] = frame_type;
+    hub_to_json(doc);
+    if (doc.overflowed() || measureJson(doc) + 1 > cap) return 0;
+    return serializeJson(doc, out, cap);
 }

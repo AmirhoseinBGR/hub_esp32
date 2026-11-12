@@ -41,7 +41,7 @@ function readConfig(env = process.env) {
     sessionSecret: env.SESSION_SECRET || '',
     deviceId: env.DEVICE_ID || 'hub-01',
     deviceToken: env.DEVICE_TOKEN || '',
-    deviceTimeoutMs: Math.max(5000, Number(env.DEVICE_TIMEOUT_MS || 15000)),
+    deviceTimeoutMs: Math.max(5000, Number(env.DEVICE_TIMEOUT_MS || 45000)),
     commandTimeoutMs: Math.max(3000, Number(env.COMMAND_TIMEOUT_MS || 10000)),
     nodeEnv: env.NODE_ENV || 'development',
     publicDir: path.join(__dirname, 'public'),
@@ -238,20 +238,20 @@ function createHubServer(options = {}) {
   }
 
   function issueCommand(action, payload = {}, timeoutMs = config.commandTimeoutMs) {
-    if (!isDeviceOnline()) return Promise.reject(new HttpError(503, 'The hub is not connected to the cloud server.'));
-    if (pendingCommands.size >= 32) return Promise.reject(new HttpError(429, 'Too many commands are waiting for the hub.'));
+    if (!isDeviceOnline()) return Promise.reject(new HttpError(503, 'هاب به سرور ابری متصل نیست.'));
+    if (pendingCommands.size >= 32) return Promise.reject(new HttpError(429, 'تعداد فرمان‌های در انتظار زیاد است؛ کمی بعد دوباره تلاش کنید.'));
     const id = crypto.randomUUID();
     const timeout = Math.max(1000, Math.min(Number(timeoutMs) || config.commandTimeoutMs, 30000));
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         pendingCommands.delete(id);
-        reject(new HttpError(504, 'The hub did not acknowledge the command in time.'));
+        reject(new HttpError(504, 'هاب در مهلت مقرر پاسخ نداد.'));
       }, timeout);
       pendingCommands.set(id, { resolve, reject, timer, action });
       if (!sendJson(deviceSocket, { type: 'command', id, action, payload })) {
         clearTimeout(timer);
         pendingCommands.delete(id);
-        reject(new HttpError(503, 'The WebSocket connection to the hub was lost.'));
+        reject(new HttpError(503, 'اتصال وب‌سوکت به هاب قطع شده است.'));
       }
     });
   }
@@ -334,10 +334,25 @@ function createHubServer(options = {}) {
     if (!message || typeof message !== 'object' || Array.isArray(message)) return;
     lastSeen = Date.now();
 
-    if (message.type === 'state' && message.state && typeof message.state === 'object' && !Array.isArray(message.state)) {
-      lastState = message.state;
-      if (scanPending && lastState.wifi && !lastState.wifi.scanning) scanPending = false;
-      broadcastState();
+    if (message.type === 'state') {
+      // The ESP32 firmware spreads the hub_to_json() fields next to "type"
+      // ({"type":"state","wifi":{...},"devices":[...]}, see cloud_link.cpp).
+      // A nested {"state":{...}} envelope is also accepted so future
+      // firmware revisions can switch shapes without breaking the relay.
+      let state = null;
+      if (message.state && typeof message.state === 'object' && !Array.isArray(message.state)) {
+        state = message.state;
+      } else {
+        const { type: _ignored, ...fields } = message;
+        const looksLikeState = (fields.wifi && typeof fields.wifi === 'object' && !Array.isArray(fields.wifi)) ||
+          Array.isArray(fields.devices);
+        if (looksLikeState) state = fields;
+      }
+      if (state) {
+        lastState = state;
+        if (scanPending && lastState.wifi && !lastState.wifi.scanning) scanPending = false;
+        broadcastState();
+      }
       return;
     }
     if (message.type === 'gsm') {
@@ -377,6 +392,7 @@ function createHubServer(options = {}) {
       const match = /^Bearer\s+(.+)$/i.exec(authorization);
       const deviceId = String(req.headers['x-device-id'] || '');
       if (!match || !safeEqual(match[1], config.deviceToken) || !safeEqual(deviceId, config.deviceId)) {
+        console.warn('[device] rejected a hub connection attempt (bad credentials)');
         return rejectUpgrade(socket, 401, 'Unauthorized device');
       }
       return wss.handleUpgrade(req, socket, head, (ws) => {
@@ -385,15 +401,18 @@ function createHubServer(options = {}) {
         }
         deviceSocket = ws;
         lastSeen = Date.now();
+        console.log('[device] hub connected');
         ws.isAlive = true;
-        ws.on('pong', () => { ws.isAlive = true; lastSeen = Date.now(); });
+        ws.missedPongs = 0;
+        ws.on('pong', () => { ws.isAlive = true; ws.missedPongs = 0; lastSeen = Date.now(); });
         ws.on('message', (data, binary) => handleDeviceMessage(ws, data, binary));
         ws.on('error', () => {});
-        ws.on('close', () => {
+        ws.on('close', (code) => {
           if (deviceSocket === ws) {
+            console.log(`[device] hub disconnected (code ${code})`);
             deviceSocket = null;
             scanPending = false;
-            failPending(503, 'The hub disconnected before acknowledging the command.');
+            failPending(503, 'اتصال هاب پیش از تأیید فرمان قطع شد.');
             broadcastState();
           }
         });
@@ -418,7 +437,15 @@ function createHubServer(options = {}) {
     rejectUpgrade(socket, 404, 'WebSocket route not found');
   });
 
-  app.get('/healthz', (_req, res) => res.json({ ok: true, service: 'evohatch-cloud', deviceOnline: isDeviceOnline() }));
+  app.get('/healthz', (_req, res) => res.json({
+    ok: true,
+    service: 'evohatch-cloud',
+    deviceOnline: isDeviceOnline(),
+    // Diagnostics: separates "never connected" (lastSeenAgoMs null) from
+    // "socket open but silent" (deviceSocket true, deviceOnline false).
+    deviceSocket: !!deviceSocket && deviceSocket.readyState === WebSocket.OPEN,
+    lastSeenAgoMs: lastSeen ? Math.max(0, Date.now() - lastSeen) : null,
+  }));
   app.get('/api/auth/me', (req, res) => {
     const session = sessionForRequest(req);
     res.setHeader('Cache-Control', 'no-store');
@@ -447,7 +474,7 @@ function createHubServer(options = {}) {
   app.get('/api/scan', requireLogin, asyncRoute(async (req, res) => {
     if (req.query.refresh === '1' || (!lastState.wifi?.networks?.length && !scanPending)) {
       const result = await issueCommand('wifi.scan', {});
-      if (!result.ok) throw new HttpError(502, result.message || 'The hub could not start a Wi-Fi scan.');
+      if (!result.ok) throw new HttpError(502, result.message || 'هاب نتوانست اسکن وای‌فای را شروع کند.');
       scanPending = !!result.data.scanning;
     }
     const wifi = currentState().wifi;
@@ -456,7 +483,7 @@ function createHubServer(options = {}) {
 
   app.get('/api/ping', requireLogin, asyncRoute(async (_req, res) => {
     const result = await issueCommand('server.ping', {}, Math.max(config.commandTimeoutMs, 12000));
-    if (!result.ok) throw new HttpError(502, result.message || 'The hub could not perform the connectivity test.');
+    if (!result.ok) throw new HttpError(502, result.message || 'هاب نتوانست تست ارتباط را انجام دهد.');
     res.json({ ok: result.data.ok === true });
   }));
 
@@ -470,7 +497,7 @@ function createHubServer(options = {}) {
     const ssid = normalizeSafeText(req.body?.ssid, 'ssid', 32, { trim: false });
     const pass = normalizeSafeText(req.body?.pass ?? '', 'pass', 64, { required: false, trim: false });
     const result = await issueCommand('wifi.set', { ssid, pass });
-    if (!result.ok) throw new HttpError(502, result.message || 'The hub rejected the Wi-Fi settings.');
+    if (!result.ok) throw new HttpError(502, result.message || 'هاب تنظیمات وای‌فای را نپذیرفت.');
     res.json({ ok: true });
   }));
 
@@ -479,7 +506,7 @@ function createHubServer(options = {}) {
     const rate = Number(req.body?.rate);
     if (!Number.isInteger(rate) || !VALID_RATES.has(rate)) throw new HttpError(400, 'rate is not supported.');
     const result = await issueCommand('server.set', { domain, rate });
-    if (!result.ok) throw new HttpError(502, result.message || 'The hub rejected the server settings.');
+    if (!result.ok) throw new HttpError(502, result.message || 'هاب تنظیمات سرور را نپذیرفت.');
     res.json({ ok: true });
   }));
 
@@ -488,7 +515,7 @@ function createHubServer(options = {}) {
     if (phones.some((phone) => phone && !/^\+?[0-9]+$/.test(phone))) throw new HttpError(400, 'Phone numbers may contain digits and an optional leading plus sign only.');
     const mask = toMask(req.body?.mask);
     const result = await issueCommand('sim.set', { p1: phones[0], p2: phones[1], p3: phones[2], mask });
-    if (!result.ok) throw new HttpError(502, result.message || 'The hub rejected the SIM settings.');
+    if (!result.ok) throw new HttpError(502, result.message || 'هاب تنظیمات سیم‌کارت را نپذیرفت.');
     res.json({ ok: true });
   }));
 
@@ -505,14 +532,14 @@ function createHubServer(options = {}) {
       id, sp_t: Math.round(temp * 10) / 10, sp_h: Math.round(humidity * 10) / 10,
       mask, paired: req.body.paired,
     });
-    if (!result.ok) throw new HttpError(502, result.message || 'The hub rejected the device settings.');
+    if (!result.ok) throw new HttpError(502, result.message || 'هاب تنظیمات دستگاه را نپذیرفت.');
     res.json({ ok: true });
   }));
 
   app.post('/api/gsm', requireLogin, requireSameOrigin, asyncRoute(async (req, res) => {
     const cmd = normalizeSafeText(req.body?.cmd, 'cmd', 127);
     const result = await issueCommand('gsm.command', { cmd });
-    if (!result.ok) throw new HttpError(502, result.message || 'The hub rejected the modem command.');
+    if (!result.ok) throw new HttpError(502, result.message || 'هاب فرمان مودم را نپذیرفت.');
     res.json({ ok: true });
   }));
 
@@ -520,7 +547,7 @@ function createHubServer(options = {}) {
     const cmd = normalizeSafeText(req.body?.cmd, 'cmd', 150);
     if (!/^[\x20-\x7e]+$/.test(cmd)) throw new HttpError(400, 'cmd must contain printable ASCII characters only.');
     const result = await issueCommand('settings.command', { cmd }, 18000);
-    if (!result.ok) throw new HttpError(502, result.message || 'The STM32 did not accept the settings command.');
+    if (!result.ok) throw new HttpError(502, result.message || 'برد اصلی فرمان تنظیمات را نپذیرفت.');
     res.json({ ok: true, text: result.message });
   }));
 
@@ -537,17 +564,32 @@ function createHubServer(options = {}) {
   });
   app.use((error, _req, res, _next) => {
     const status = Number.isInteger(error.status) ? error.status : (error instanceof SyntaxError ? 400 : 500);
-    const message = status >= 500 ? 'خطای داخلی سرور.' : (error.message || 'درخواست نامعتبر است.');
-    if (status >= 500) console.error('[api]', error.message);
+    // Deliberate HttpErrors (hub offline, hub timeout, ...) carry the real,
+    // user-actionable reason. Masking every 5xx as a generic internal
+    // error hid the actual cause from the panel for far too long.
+    const deliberate = error instanceof HttpError;
+    const message = deliberate ? error.message : (status >= 500 ? 'خطای داخلی سرور.' : (error.message || 'درخواست نامعتبر است.'));
+    if (status >= 500 && !deliberate) console.error('[api]', error.message);
     res.status(status).json({ ok: false, error: message });
   });
 
   const heartbeat = setInterval(() => {
     if (deviceSocket && deviceSocket.readyState === WebSocket.OPEN) {
+      // The hub is a single-loop embedded board: serving its local panel
+      // or running a Wi-Fi scan can delay pongs for many seconds. Treat
+      // the link as dead only after several consecutive missed pongs
+      // (~45-60 s of total silence), never after a single slow reply -
+      // killing a merely busy hub was the main source of flapping.
       if (deviceSocket.isAlive === false) {
-        deviceSocket.terminate();
+        deviceSocket.missedPongs = (deviceSocket.missedPongs || 0) + 1;
+        if (deviceSocket.missedPongs >= 3) {
+          deviceSocket.terminate();
+        } else {
+          try { deviceSocket.ping(); } catch { deviceSocket.terminate(); }
+        }
       } else {
         deviceSocket.isAlive = false;
+        deviceSocket.missedPongs = 0;
         try { deviceSocket.ping(); } catch { deviceSocket.terminate(); }
       }
     }
@@ -563,7 +605,7 @@ function createHubServer(options = {}) {
     closed = true;
     clearInterval(heartbeat);
     for (const client of wss.clients) client.terminate();
-    failPending(503, 'The cloud server is shutting down.');
+    failPending(503, 'سرور ابری در حال خاموش شدن است.');
     if (!server.listening) return;
     await new Promise((resolve) => server.close(resolve));
   }
